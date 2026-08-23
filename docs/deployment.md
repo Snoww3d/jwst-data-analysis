@@ -171,6 +171,24 @@ The staging setup uses `docker-compose.staging.yml` which differs from productio
 | nginx config | `nginx-staging.conf` | `nginx-ssl.conf` |
 | CORS origin | `http://<ip>` | `https://domain.com` |
 
+## Sky Map (Aladin Lite) and Content-Security-Policy
+
+The search page's sky map (MAST Search v2 Phase 5) loads Aladin Lite v3 at
+runtime from `https://aladin.cds.unistra.fr` (override with `VITE_ALADIN_URL`
+at build time to self-host the bundle) and streams HiPS imagery tiles from the
+CDS hosts (`alasky.cds.unistra.fr` and mirrors). `nginx-ssl.conf` already
+carries the required CSP directives, with a comment explaining each one.
+
+**CE operators:** `nginx-ce.conf` ships no CSP header, so the map works there
+out of the box (online). If you add a CSP to a CE deployment, copy the
+directives from `nginx-ssl.conf`: the Aladin host + `'wasm-unsafe-eval'` in
+`script-src`, `data:` and the CDS hosts in `connect-src` (tiles are fetched
+via `fetch()` from the wasm core), the CDS hosts in `img-src` (the low-res
+Allsky preview is an image element), and `blob:` in `worker-src`. Offline CE:
+the map renders footprints and the pre-baked coverage layer without imagery
+(the CE engine image builds with `PREFETCH_COVERAGE=true`, which bakes the
+coverage snapshot into the image at `/app/coverage/mast-coverage.json`).
+
 ## Disk Usage Notes
 
 JWST FITS files are large (100 MB – 5 GB each). A single target like Pillars of Creation can consume 15–20 GB across all filters. The 100 GB EBS volume provides comfortable headroom for caching multiple targets on the staging server.

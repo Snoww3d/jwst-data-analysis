@@ -445,6 +445,23 @@ namespace JwstDataAnalysis.API.Models
         public string? StartedAt { get; set; }
     }
 
+    /// <summary>
+    /// Raw sky-coverage payload proxied from the processing engine
+    /// (MAST Search v2 Phase 5). The engine's JSON passes through verbatim
+    /// with its status code: 200 grid/footprints, 202 while the snapshot is
+    /// being built (with Retry-After), 400 for a bad bbox.
+    /// </summary>
+    public class MastCoverageProxyResult
+    {
+        public int StatusCode { get; set; }
+
+        public string Json { get; set; } = "{}";
+
+        public string? RetryAfter { get; set; }
+
+        public string? CacheControl { get; set; }
+    }
+
     // Response listing resumable jobs
     public class ResumableJobsResponse
     {

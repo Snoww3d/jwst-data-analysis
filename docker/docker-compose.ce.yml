@@ -55,6 +55,9 @@ services:
       args:
         # CE never runs calibration — skip the ~2GB jwst layer (#1709).
         INSTALL_CALIBRATION: "false"
+        # Bake the JWST sky-coverage snapshot into the image so the search
+        # page's empty-state map works offline (MAST Search v2 Phase 5).
+        PREFETCH_COVERAGE: "true"
     container_name: jwst-ce-engine
     restart: unless-stopped
     mem_limit: 4g
@@ -64,6 +67,9 @@ services:
       # Deny-by-default: ONLY the /api read/search/render facade mounts; the
       # middleware 404s everything else. See tests/test_ce_mode_mounting.py.
       - CE_MODE=true
+      # Sky-coverage snapshot baked at build (PREFETCH_COVERAGE) lives outside
+      # the read-only /app/data mount; refreshes land here too.
+      - MAST_COVERAGE_FILE=/app/coverage/mast-coverage.json
       # Read-only credentials: ceReader has the `read` role on the app DB
       # and nothing else. Created by mongo-init-ce/create-ce-reader.js.
       # Password is interpolated RAW into the URI — must be URL-safe

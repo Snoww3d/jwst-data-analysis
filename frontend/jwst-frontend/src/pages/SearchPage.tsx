@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import MastSearch from '../components/mast/MastSearch';
-import WhatsNewPanel from '../components/WhatsNewPanel';
 import './SearchPage.css';
 
 /**
- * Search page — public MAST search + "What's New on MAST" browsing.
+ * Search page — public MAST search. "What's New on MAST" lives inside
+ * MastSearch as the browse-first empty state (MAST Search v2 Phase 5).
  *
  * Extracted from the library dashboard (#1617) as /archive, then promoted to
  * the nav "Search" slot at /search (MAST Search v2, Phase 1; /archive
@@ -29,15 +29,6 @@ export function SearchPage() {
       </div>
 
       <MastSearch />
-
-      {/*
-        WhatsNewPanel no longer takes an onImportComplete callback —
-        `useActiveImports` (the global header pill's hook) is the single
-        source of import-completion toasts, with last-job-in-batch
-        aggregation so bulk imports don't spam one toast per job. See
-        useActiveImports.ts.
-      */}
-      <WhatsNewPanel />
     </div>
   );
 }

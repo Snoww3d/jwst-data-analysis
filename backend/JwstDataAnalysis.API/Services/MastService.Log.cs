@@ -32,6 +32,10 @@ namespace JwstDataAnalysis.API.Services
             Message = "Searching MAST by facets: days_back={DaysBack}")]
         private partial void LogSearchingFacets(int? daysBack);
 
+        [LoggerMessage(EventId = 4108, Level = LogLevel.Information,
+            Message = "Getting MAST sky coverage: {Scope}")]
+        private partial void LogGettingCoverage(string scope);
+
         [LoggerMessage(EventId = 4106, Level = LogLevel.Information,
             Message = "Getting data products for observation: {ObsId}")]
         private partial void LogGettingDataProducts(string obsId);

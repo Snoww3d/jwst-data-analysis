@@ -1,0 +1,80 @@
+/* SplitView — JWST Discovery design-system primitive. */
+
+.split-view {
+  --split-ratio: 55%;
+  --split-divider: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: var(--space-4);
+  min-width: 0;
+  align-items: stretch;
+}
+
+.split-view-pane {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Stacked (< 1024px): the divider is meaningless, hide it. */
+.split-view-divider {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .split-view {
+    grid-template-columns:
+      minmax(0, calc(var(--split-ratio) - var(--split-divider) / 2))
+      var(--split-divider)
+      minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .split-view-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .split-view-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: col-resize;
+    touch-action: none;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+  }
+
+  .split-view-divider:hover,
+  .split-view-dragging .split-view-divider {
+    background: var(--accent-primary-subtle);
+  }
+
+  .split-view-divider:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+  }
+
+  .split-view-grip {
+    width: 2px;
+    height: 40px;
+    border-radius: var(--radius-xs);
+    background: var(--border-strong);
+    transition: background var(--transition-fast);
+  }
+
+  .split-view-divider:hover .split-view-grip,
+  .split-view-dragging .split-view-grip,
+  .split-view-divider:focus-visible .split-view-grip {
+    background: var(--accent-primary);
+  }
+
+  .split-view-dragging {
+    cursor: col-resize;
+  }
+
+  /* Drags must not get swallowed by the panes' content (iframes/canvas). */
+  .split-view-dragging .split-view-pane {
+    pointer-events: none;
+  }
+}

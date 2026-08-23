@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cachetools import TTLCache
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.storage.factory import get_storage_provider
 
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 from .cache import MastCache
 from .chunked_downloader import ChunkedDownloader, DownloadJobState, SpeedTracker
+from .coverage import BBOX_CAP, CoverageStore, parse_bbox
 from .download_state_manager import DownloadStateManager
 from .download_tracker import DownloadStage, FileProgress, download_tracker
 from .mast_service import MastService
@@ -413,6 +414,59 @@ async def search_by_facets(request: MastFacetSearchRequest):
     _facet_search_cache[cache_key] = response
 
     return response
+
+
+# Sky-coverage snapshot for the browse-first empty state (MAST Search v2
+# Phase 5). One store per process; it seeds itself from MAST_COVERAGE_FILE
+# and refreshes from MAST in the background once a day — see coverage.py.
+coverage_store = CoverageStore()
+COVERAGE_RETRY_AFTER_SECONDS = 20
+
+
+@router.get("/coverage")
+async def get_coverage(
+    response: Response,
+    bbox: str | None = Query(
+        default=None,
+        description="ra_min,dec_min,ra_max,dec_max in degrees (RA may wrap); "
+        "returns real footprints in that box instead of the density grid",
+    ),
+):
+    """
+    Where JWST has looked: every public Level-3 science image.
+
+    Without `bbox` → `{shape:'grid', nside, cells:[[pix,n],...]}` — a HEALPix
+    (NESTED) density grid for whole-sky FOVs. With `bbox` →
+    `{shape:'footprints', rows:[{obs_id, instrument_name, t_obs_release,
+    s_region}], truncated}` for zoomed-in FOVs. Snapshot cached 24 h and
+    served stale (`stale: true`) while a refresh runs; 202 + Retry-After
+    while the first snapshot is being built.
+    """
+    box = None
+    if bbox is not None:
+        try:
+            box = parse_bbox(bbox)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    snapshot = await asyncio.to_thread(coverage_store.get)
+    if snapshot is None:
+        response.status_code = 202
+        response.headers["Retry-After"] = str(COVERAGE_RETRY_AFTER_SECONDS)
+        response.headers["Cache-Control"] = "no-store"
+        return {
+            "status": "building",
+            "retry_after": COVERAGE_RETRY_AFTER_SECONDS,
+            "error": coverage_store.last_error,
+        }
+
+    if box is None:
+        payload = snapshot.grid_payload()
+        response.headers["Cache-Control"] = "public, max-age=86400"
+    else:
+        payload = snapshot.footprints_payload(box, BBOX_CAP)
+        response.headers["Cache-Control"] = "public, max-age=3600"
+    return payload
 
 
 @router.post("/products", response_model=MastDataProductsResponse)

@@ -12,7 +12,7 @@ vi.mock('../components/WhatsNewPanel', () => ({
 }));
 
 describe('SearchPage', () => {
-  it("renders the page header, MAST search, and What's New panel", () => {
+  it('renders the page header and MAST search', () => {
     render(
       <MemoryRouter>
         <SearchPage />
@@ -20,6 +20,14 @@ describe('SearchPage', () => {
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Search' })).toBeInTheDocument();
     expect(screen.getByTestId('mast-search')).toBeInTheDocument();
-    expect(screen.getByTestId('whats-new-panel')).toBeInTheDocument();
+  });
+
+  it("no longer renders What's New at page level — it is MastSearch's empty state (Phase 5)", () => {
+    render(
+      <MemoryRouter>
+        <SearchPage />
+      </MemoryRouter>
+    );
+    expect(screen.queryByTestId('whats-new-panel')).toBeNull();
   });
 });

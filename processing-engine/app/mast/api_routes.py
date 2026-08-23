@@ -12,7 +12,7 @@ Target search resolves featured-target display names to catalog ids first
 'M16').
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import ValidationError
 
 from app.db.casing import camel_to_snake_keys
@@ -27,6 +27,7 @@ from app.mast.models import (
     MastTargetSearchRequest,
 )
 from app.mast.routes import (
+    get_coverage,
     search_by_coordinates,
     search_by_facets,
     search_by_observation_id,
@@ -97,6 +98,13 @@ async def api_search_facets(body: dict) -> MastSearchResponse:
     """Position-less facet search (MAST Search v2 Phase 4). `filters` is the
     same closed MastCriteria whitelist as the target/coordinate routes."""
     return await search_by_facets(_validate(MastFacetSearchRequest, body))
+
+
+@router.get("/coverage")
+async def api_coverage(response: Response, bbox: str | None = Query(default=None)):
+    """Sky-coverage snapshot for the browse-first empty state (MAST Search
+    v2 Phase 5). Read-only, no client-settable criteria beyond `bbox`."""
+    return await get_coverage(response, bbox)
 
 
 @router.post("/whats-new", response_model=MastSearchResponse)

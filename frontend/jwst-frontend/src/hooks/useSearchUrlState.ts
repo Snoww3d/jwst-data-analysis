@@ -27,7 +27,7 @@ import {
  *   calib  `all` → calibration levels 1–3; a comma list (`2,3`) for a
  *          subset; absent → level 3 only
  *   sort   `col:dir` for the results table (Phase 3); absent → default sort
- *   view   `split` for table + sky map (Phase 5 wires it); absent → table
+ *   view   `split` for table + sky map (Phase 5); absent → table
  *   inst, mode, filt, dpt, from, to, exp, intent, days
  *          the filter rail (Phase 4) — see utils/mastCriteria.ts. A URL
  *          with facets and no `q` is a facet-only search and auto-runs.
@@ -77,6 +77,8 @@ export interface SearchUrlStateApi extends SearchUrlState {
   replace: (next: SearchUrlState) => void;
   /** Replace just the sort (keeps every other param). */
   setSort: (sort: string | undefined) => void;
+  /** Replace just the view (keeps every other param). */
+  setView: (view: SearchView) => void;
 }
 
 const SORT_RE = /^[a-z_]+:(asc|desc)$/;
@@ -162,6 +164,15 @@ export function useSearchUrlState(): SearchUrlStateApi {
     [searchParams, setSearchParams]
   );
 
+  const setView = useCallback(
+    (view: SearchView) => {
+      setSearchParams(toSearchParams({ ...fromSearchParams(searchParams), view }), {
+        replace: true,
+      });
+    },
+    [searchParams, setSearchParams]
+  );
+
   return {
     ...state,
     navKey: location.key,
@@ -170,5 +181,6 @@ export function useSearchUrlState(): SearchUrlStateApi {
     push,
     replace,
     setSort,
+    setView,
   };
 }

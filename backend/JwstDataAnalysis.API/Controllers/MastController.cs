@@ -232,6 +232,48 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// JWST sky coverage for the search page's browse-first empty state
+        /// (MAST Search v2 Phase 5). Pure passthrough to the processing engine:
+        /// status (200 / 202 building / 400), JSON body and cache headers are
+        /// the engine's.
+        /// </summary>
+        [HttpGet("coverage")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetCoverage([FromQuery] string? bbox)
+        {
+            try
+            {
+                var result = await mastService.GetCoverageAsync(bbox);
+                if (!string.IsNullOrEmpty(result.RetryAfter))
+                {
+                    Response.Headers["Retry-After"] = result.RetryAfter;
+                }
+
+                if (!string.IsNullOrEmpty(result.CacheControl))
+                {
+                    Response.Headers.CacheControl = result.CacheControl;
+                }
+
+                return new ContentResult
+                {
+                    StatusCode = result.StatusCode,
+                    Content = result.Json,
+                    ContentType = "application/json",
+                };
+            }
+            catch (HttpRequestException ex)
+            {
+                LogCoverageFailed(ex);
+                return ProcessingEngineError(ex);
+            }
+            catch (Exception ex)
+            {
+                LogCoverageFailed(ex);
+                return StatusCode(500, new { error = "MAST coverage failed" });
+            }
+        }
+
+        /// <summary>
         /// Get available data products for an observation.
         /// </summary>
         [HttpPost("products")]

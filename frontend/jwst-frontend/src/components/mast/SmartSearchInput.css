@@ -105,6 +105,12 @@
   margin-top: var(--space-3);
 }
 
+/* Browse-first empty state: recents lead, above the input. */
+.smart-search-recents-above {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+}
+
 .smart-search-recents-label {
   font-size: var(--text-xs);
   text-transform: uppercase;
