@@ -5,14 +5,31 @@ export interface MastRecentReleasesRequest {
   offset?: number;
 }
 
+/**
+ * MAST search envelope. snake_case on purpose: this is the Python
+ * processing-engine's wire shape (MAST Search v2 Phase 0 added `truncated`
+ * and `page_size`), proxied untouched by the .NET gateway.
+ */
 export interface MastSearchResponse {
   search_type: string;
   query_params: Record<string, unknown>;
   results: MastObservationResult[];
   result_count: number;
   timestamp: string;
+  /** True when the server hit its page cap — more rows exist than were returned. */
+  truncated?: boolean;
+  /** The server's row cap for this query (default 500). */
+  page_size?: number;
 }
 
+/**
+ * One observation row. These are RAW CAOM column names (`obs_id`, `s_region`,
+ * `t_exptime`, ...) exactly as MAST returns them — do NOT normalise to
+ * camelCase. The results table, the sky-map footprints (Phase 5) and the
+ * import request all consume these names, they match MAST's documentation,
+ * and the contract fixtures under processing-engine/tests/contract assert
+ * them. The hooks hide the envelope; the rows stay as they are.
+ */
 export interface MastObservationResult {
   obs_id?: string;
   target_name?: string;
@@ -29,6 +46,7 @@ export interface MastObservationResult {
   proposal_id?: string;
   proposal_pi?: string;
   obs_collection?: string;
+  s_region?: string; // STC-S footprint polygon (Phase 5 sky map)
   jpegURL?: string; // Preview thumbnail URL from MAST
   [key: string]: unknown;
 }
