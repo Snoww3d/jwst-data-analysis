@@ -52,6 +52,7 @@ CE_API_SURFACE = {
     "/api/mast/search/coordinates",
     "/api/mast/search/observation",
     "/api/mast/search/program",
+    "/api/mast/search/facets",
     "/api/mast/whats-new",
     "/api/composite/generate-nchannel",
     "/api/jwstdata/{data_id}/preview",
