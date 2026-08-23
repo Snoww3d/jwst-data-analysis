@@ -174,6 +174,73 @@ export function formatDec(dec: number): string {
 }
 
 /**
+ * Split one sexagesimal field into up to three numeric parts, tolerant of
+ * the usual separators: `10h 37m 12.3s`, `10:37:12.3`, `10 37 12.3`,
+ * `-58°12'34"`, `-58d 12m 34s`, `-58°`. Returns the sign and the parts, or
+ * null when anything other than digits/separators is present or there are
+ * more than three parts.
+ */
+function splitSexagesimal(field: string): { sign: 1 | -1; parts: number[] } | null {
+  // U+2212 MINUS SIGN shows up in pasted coordinates; treat it as '-'.
+  let s = field.trim().replace(/−/g, '-').toLowerCase();
+  let sign: 1 | -1 = 1;
+  if (s.startsWith('+') || s.startsWith('-')) {
+    if (s.startsWith('-')) sign = -1;
+    s = s.slice(1).trim();
+  }
+  if (!s) return null;
+  // Any marker/separator between parts. `°′″` and the ASCII `'"`/`d m s`/`h`
+  // spellings all mean "end of this part".
+  const tokens = s.split(/[hdms°′″'":\s]+/).filter((t) => t.length > 0);
+  if (tokens.length === 0 || tokens.length > 3) return null;
+  const parts: number[] = [];
+  for (const [i, tok] of tokens.entries()) {
+    // Only the last part may carry a fraction; minutes must be whole when
+    // seconds follow.
+    const re = i === tokens.length - 1 ? /^\d+(?:\.\d+)?$/ : /^\d+$/;
+    if (!re.test(tok)) return null;
+    parts.push(parseFloat(tok));
+  }
+  // A stray marker character not consumed above (e.g. a letter inside a
+  // number) fails the numeric test, so reaching here means clean parts.
+  return { sign, parts };
+}
+
+function sexagesimalToUnits(parts: number[]): number | null {
+  const [a, b = 0, c = 0] = parts;
+  if (parts.length > 1 && b >= 60) return null;
+  if (parts.length > 2 && c >= 60) return null;
+  return a + b / 60 + c / 3600;
+}
+
+/**
+ * Parse a sexagesimal RA/Dec pair into decimal degrees.
+ *
+ * RA is hours-minutes-seconds (×15 → degrees); Dec is degrees-arcmin-arcsec.
+ * Accepts `10h 37m 12.3s`, `10:37:12.3`, `10 37 12.3`, and seconds-less or
+ * minutes-less forms (`10h 37m`, `-58°`). Returns null when either field is
+ * malformed or out of range (RA outside [0, 360), |Dec| > 90).
+ *
+ * Inverse of formatRA/formatDec above.
+ */
+export function parseSexagesimal(ra: string, dec: string): { ra: number; dec: number } | null {
+  const raParts = splitSexagesimal(ra);
+  const decParts = splitSexagesimal(dec);
+  if (!raParts || !decParts) return null;
+  if (raParts.sign < 0) return null;
+
+  const hours = sexagesimalToUnits(raParts.parts);
+  const decDeg = sexagesimalToUnits(decParts.parts);
+  if (hours === null || decDeg === null) return null;
+
+  const raDeg = hours * 15;
+  if (raDeg < 0 || raDeg >= 360) return null;
+  if (decDeg > 90) return null;
+
+  return { ra: raDeg, dec: decParts.sign * decDeg };
+}
+
+/**
  * Format pixel value in scientific notation with units
  * @param value - Pixel value
  * @param units - Unit string from FITS header (e.g., "MJy/sr")

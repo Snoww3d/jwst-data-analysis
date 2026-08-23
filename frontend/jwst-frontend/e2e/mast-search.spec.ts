@@ -12,30 +12,58 @@ test.describe('MAST search panel', () => {
     await expect(page.locator('.mast-search')).toBeVisible();
   });
 
-  test('defaults to target name search type', async ({ page }) => {
-    const selectedLabel = page.locator('.search-type-selector label.selected');
-    await expect(selectedLabel).toContainText('Target Name');
+  test('one smart input, no mode radios (MAST Search v2 Phase 2)', async ({ page }) => {
+    await expect(page.locator('input.smart-search-input')).toBeVisible();
+    await expect(page.locator('.search-type-selector')).toHaveCount(0);
   });
 
-  test('switches between search types', async ({ page }) => {
-    // Click on "Coordinates" radio
-    const coordLabel = page
-      .locator('.search-type-selector label')
-      .filter({ hasText: 'Coordinates' });
-    await coordLabel.click();
-    await expect(coordLabel).toHaveClass(/selected/);
+  test('interprets each Discover chip as the user types', async ({ page }) => {
+    const input = page.locator('input.smart-search-input');
+    const hint = page.locator('.smart-search-hint');
+    const radius = page.getByLabel('Search radius (degrees)');
 
-    // Click on "Observation ID"
-    const obsLabel = page
-      .locator('.search-type-selector label')
-      .filter({ hasText: 'Observation ID' });
-    await obsLabel.click();
-    await expect(obsLabel).toHaveClass(/selected/);
+    await input.fill('NGC 3324');
+    await expect(hint).toHaveText('Interpreted as: target name "NGC 3324"');
+    await expect(radius).toBeVisible();
+
+    await input.fill('10h 37m -58°');
+    await expect(hint).toHaveText('Interpreted as: coordinates 159.25°, −58.00°');
+    await expect(radius).toBeVisible();
+
+    await input.fill('PID 2739');
+    await expect(hint).toHaveText('Interpreted as: program 2739');
+    await expect(radius).toBeHidden();
+
+    await input.fill('jw02739-o001');
+    await expect(hint).toHaveText('Interpreted as: observation ID jw02739-o001');
+    await expect(radius).toBeHidden();
   });
 
-  test('shows radius input for target search', async ({ page }) => {
-    // Target search is default — should show radius
-    await expect(page.locator('input[placeholder*="Radius"]')).toBeVisible();
+  test('submitting pushes ?q= to the URL and Back restores it', async ({ page }) => {
+    await page.route('**/api/mast/search/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"results":[]}' })
+    );
+    const input = page.locator('input.smart-search-input');
+    await input.fill('M16');
+    await page.locator('.search-button').click();
+    await expect(page).toHaveURL(/\/search\?q=M16$/);
+
+    await input.fill('NGC 3324');
+    await page.locator('.search-button').click();
+    await expect(page).toHaveURL(/q=NGC\+3324/);
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/search\?q=M16$/);
+    await expect(input).toHaveValue('M16');
+  });
+
+  test('opening /search?q= runs the search and lists it under Recent', async ({ page }) => {
+    await page.route('**/api/mast/search/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"results":[]}' })
+    );
+    await page.goto('/search?q=PID+2739');
+    await expect(page.locator('input.smart-search-input')).toHaveValue('PID 2739');
+    await expect(page.locator('.smart-search-recent-chip', { hasText: 'PID 2739' })).toBeVisible();
   });
 
   test('search button is visible and enabled', async ({ page }) => {

@@ -617,3 +617,9 @@
 
 /* @keyframes progress-shimmer and @keyframes spin are defined globally in
    index.css and reused here. */
+
+.download-source-badge {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  font-style: italic;
+}

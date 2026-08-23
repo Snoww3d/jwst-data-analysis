@@ -5,6 +5,7 @@ import {
   pixelToWCS,
   formatRA,
   formatDec,
+  parseSexagesimal,
   formatPixelValue,
   calculateCursorInfo,
 } from './coordinateUtils';
@@ -465,5 +466,45 @@ describe('calculateCursorInfo', () => {
     if (!result) throw new Error('expected result');
     expect(Number.isInteger(result.previewX)).toBe(true);
     expect(Number.isInteger(result.previewY)).toBe(true);
+  });
+});
+
+describe('parseSexagesimal', () => {
+  it.each<[string, string, number, number]>([
+    ['10h 37m 12.3s', '-58d 12\' 34"', 159.30125, -58.209444],
+    ['10:37:12.3', '-58:12:34', 159.30125, -58.209444],
+    ['10 37 12.3', '-58 12 34', 159.30125, -58.209444],
+    ['10h37m12.3s', '−58°12′34″', 159.30125, -58.209444],
+    ['10h 37m', '-58°', 159.25, -58],
+    ['10h', '+58', 150, 58],
+    ['0 0 0', '0 0 0', 0, 0],
+  ])('%s / %s', (ra, dec, expectedRa, expectedDec) => {
+    const result = parseSexagesimal(ra, dec);
+    expect(result?.ra).toBeCloseTo(expectedRa, 5);
+    expect(result?.dec).toBeCloseTo(expectedDec, 5);
+  });
+
+  it.each<[string, string]>([
+    ['24h 0m 0s', '0'], // RA 360
+    ['-1h', '0'], // negative RA
+    ['10h 60m', '0'], // minutes overflow
+    ['10h 0m 60s', '0'], // seconds overflow
+    ['10h', '91'], // dec out of range
+    ['10h', '-90 0 1'],
+    ['10h', '58 61'], // dec arcmin overflow
+    ['abc', '0'],
+    ['10h', ''],
+    ['10 37 12 5', '0'], // four parts
+    ['10.5 37', '0'], // fractional hours with minutes
+  ])('rejects %s / %s', (ra, dec) => {
+    expect(parseSexagesimal(ra, dec)).toBeNull();
+  });
+
+  it('round-trips formatRA/formatDec', () => {
+    const ra = 201.36506;
+    const dec = -43.01911;
+    const result = parseSexagesimal(formatRA(ra), formatDec(dec));
+    expect(result?.ra).toBeCloseTo(ra, 4);
+    expect(result?.dec).toBeCloseTo(dec, 4);
   });
 });

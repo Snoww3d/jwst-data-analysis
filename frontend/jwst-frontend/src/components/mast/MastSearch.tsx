@@ -13,7 +13,14 @@ import { mastService, jwstDataService, ApiError, type DownloadSource } from '../
 import { useJobProgress, subscribeToJobProgress } from '../../hooks/useJobProgress';
 import { useAuth } from '../../context/useAuth';
 import { useActiveImportsContext } from '../../context/useActiveImportsContext';
-import SearchForm from './SearchForm';
+import { useSearchUrlState } from '../../hooks/useSearchUrlState';
+import { parseSearchQuery, type ParsedQuery } from '../../utils/searchQueryParser';
+import {
+  loadRecentSearches,
+  recordRecentSearch,
+  type RecentSearch,
+} from '../../utils/recentSearches';
+import SmartSearchInput from './SmartSearchInput';
 import { rawFallbackOffer, type CompletedSearch } from './rawFallback';
 import ResultsTable from './ResultsTable';
 import ImportProgress from './ImportProgress';
@@ -29,13 +36,65 @@ const SEARCH_TIMEOUT_MS = 120000; // 2 minutes
  * job wiring (single/bulk/resume), and resumable-download panel.
  *
  * Decomposed from the former monolithic MastSearch.tsx (#1617) into this
- * orchestrator + SearchForm / ResultsTable / ImportProgress. Behavior is
+ * orchestrator + SmartSearchInput / ResultsTable / ImportProgress. Behavior is
  * preserved verbatim except:
  *  - `importedObsIds`/`onImportComplete` props are gone. After each search,
  *    results are checked against the library via `checkDataAvailability`
  *    (anonymous-safe); failures are swallowed silently (no badges).
  *  - Anonymous users see "Log in to import" instead of the Import button.
+ *
+ * MAST Search v2 Phase 2: the four-radio SearchForm became one parsed text
+ * input, and the URL (`?q=&r=&calib=`) is the source of truth for a search —
+ * submitting pushes the URL, and the search runs from it (so Back/Forward and
+ * deep links replay searches). Phase 3 decomposes the rest of this file.
  */
+
+/** The per-mode values the four-way `handleSearch` switch reads. */
+interface SearchFields {
+  searchType: MastSearchType;
+  targetName: string;
+  ra: string;
+  dec: string;
+  radius: string;
+  obsId: string;
+  programId: string;
+}
+
+const SEARCH_TYPE_FOR_KIND: Record<ParsedQuery['kind'], MastSearchType> = {
+  target: 'target',
+  coords: 'coordinates',
+  obsId: 'observation',
+  program: 'program',
+};
+
+function fieldsFromQuery(parsed: ParsedQuery, radius: string): SearchFields {
+  const fields: SearchFields = {
+    searchType: SEARCH_TYPE_FOR_KIND[parsed.kind],
+    targetName: '',
+    ra: '',
+    dec: '',
+    radius,
+    obsId: '',
+    programId: '',
+  };
+  switch (parsed.kind) {
+    case 'target':
+      fields.targetName = parsed.name;
+      break;
+    case 'coords':
+      fields.ra = String(parsed.ra);
+      fields.dec = String(parsed.dec);
+      break;
+    case 'obsId':
+      fields.obsId = parsed.obsId;
+      break;
+    case 'program':
+      fields.programId = parsed.programId;
+      break;
+  }
+  return fields;
+}
+
 const MastSearch: React.FC = () => {
   const { isAuthenticated } = useAuth();
   // `registerJob` hands each started job to the shared useActiveImports
@@ -46,14 +105,17 @@ const MastSearch: React.FC = () => {
   // including why /search fetches GET /api/mast/import/resumable twice.
   const { registerJob } = useActiveImportsContext();
 
+  const url = useSearchUrlState();
+  // The kind of the last search that RAN (import logic keys off it); the
+  // text box itself may hold something else while the user types.
   const [searchType, setSearchType] = useState<MastSearchType>('target');
-  const [targetName, setTargetName] = useState('');
-  const [ra, setRa] = useState('');
-  const [dec, setDec] = useState('');
-  const [radius, setRadius] = useState('0.2');
-  const [obsId, setObsId] = useState('');
-  const [programId, setProgramId] = useState('');
-  const [showAllCalibLevels, setShowAllCalibLevels] = useState(false);
+  const [query, setQuery] = useState(url.q);
+  const [radius, setRadius] = useState(url.r);
+  const [showAllCalibLevels, setShowAllCalibLevels] = useState(url.allLevels);
+  // #1766: the raw-fallback offer flips the toggle on the user's behalf. Track
+  // that so a later search of a different kind doesn't inherit it silently.
+  const offerForcedLevelsRef = useRef(false);
+  const [recents, setRecents] = useState<RecentSearch[]>(() => loadRecentSearches());
   const [downloadSource, setDownloadSource] = useState<DownloadSource>('auto');
 
   const [loading, setLoading] = useState(false);
@@ -93,20 +155,6 @@ const MastSearch: React.FC = () => {
   const totalPages = Math.ceil(searchResults.length / itemsPerPage);
   const rawOffer = rawFallbackOffer(lastSearch);
 
-  /** Changing mode invalidates the results on screen — and therefore the
-   *  offer, whose button would otherwise run a different kind of search than
-   *  the sentence above it describes. */
-  const changeSearchType = (type: MastSearchType) => {
-    setSearchType(type);
-    setSearchResults([]);
-    setLastSearch(null);
-    setError(null);
-    setCurrentPage(1);
-    // #1766: the raw-fallback offer turns this on for one search without the
-    // user ever touching the toggle. Carrying it into a different search mode
-    // silently returns L1/L2 results where the UI implies L3-only.
-    setShowAllCalibLevels(false);
-  };
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = searchResults.slice(startIndex, endIndex);
@@ -209,9 +257,16 @@ const MastSearch: React.FC = () => {
     }
   };
 
-  /** `forceAllLevels` lets the raw-data offer re-run immediately: the toggle's
-   *  state update is not visible inside this call. */
-  const handleSearch = async (forceAllLevels = false) => {
+  /** Run the search described by `fields`. `includeRaw` is passed explicitly
+   *  (not read from state) because the caller is the URL effect below, which
+   *  sets the toggle state in the same tick. */
+  const handleSearch = async (fields: SearchFields, includeRaw: boolean) => {
+    const { searchType, targetName, ra, dec, radius, obsId, programId } = fields;
+    // Back/Forward can start a new search while the last one is in flight;
+    // only the newest run may touch results/error state.
+    const seq = ++searchSeqRef.current;
+    const isCurrent = () => seq === searchSeqRef.current;
+    setSearchType(searchType);
     setLoading(true);
     setError(null);
     setSearchResults([]);
@@ -230,7 +285,6 @@ const MastSearch: React.FC = () => {
 
       // Determine calibration levels: show all (1,2,3) or just Level 3 (combined/mosaic)
       // Observation ID searches always show all levels (calibLevel undefined)
-      const includeRaw = forceAllLevels || showAllCalibLevels;
       const calibLevel = includeRaw ? [1, 2, 3] : [3];
 
       switch (searchType) {
@@ -283,6 +337,7 @@ const MastSearch: React.FC = () => {
       }
 
       clearTimeout(timeoutId);
+      if (!isCurrent()) return;
 
       if (data) {
         setSearchResults(data.results);
@@ -299,6 +354,7 @@ const MastSearch: React.FC = () => {
       }
     } catch (err) {
       clearTimeout(timeoutId);
+      if (!isCurrent()) return;
       if (err instanceof Error && err.name === 'AbortError') {
         setError(
           'Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.'
@@ -317,9 +373,53 @@ const MastSearch: React.FC = () => {
         setError(err instanceof Error ? err.message : 'Search failed');
       }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
+
+  /** Submit from the input: validate, then push the URL — the effect below
+   *  runs the search, so Back/Forward and deep links share one path. */
+  const handleSubmit = (rawQuery: string, rawRadius: string) => {
+    const q = rawQuery.trim();
+    if (!q) {
+      setError('Enter a target name, coordinates, an observation ID, or a program ID');
+      return;
+    }
+    const kind = parseSearchQuery(q).kind;
+    if (kind === 'target' || kind === 'coords') {
+      const r = parseFloat(rawRadius);
+      if (!Number.isFinite(r) || r < 0.01 || r > 10) {
+        setError('Radius must be between 0.01 and 10 degrees');
+        return;
+      }
+    }
+    let allLevels = showAllCalibLevels;
+    // #1766: the offer turned raw levels on for ONE search. Carrying that into
+    // a different kind of search silently returns L1/L2 results where the UI
+    // implies L3-only.
+    if (offerForcedLevelsRef.current && SEARCH_TYPE_FOR_KIND[kind] !== searchType) {
+      allLevels = false;
+      setShowAllCalibLevels(false);
+      offerForcedLevelsRef.current = false;
+    }
+    url.push({ q, r: rawRadius, allLevels });
+  };
+
+  // The URL drives the search. `navKey` changes on every navigation — submit,
+  // Back/Forward, the raw-data offer's replace, a deep link — and each run is
+  // guarded by ref so StrictMode's double effect and re-renders don't re-query.
+  const lastRunNavKeyRef = useRef<string | null>(null);
+  const searchSeqRef = useRef(0);
+  const { q: urlQ, r: urlR, allLevels: urlAllLevels, navKey } = url;
+  useEffect(() => {
+    if (!urlQ || lastRunNavKeyRef.current === navKey) return;
+    lastRunNavKeyRef.current = navKey;
+    setQuery(urlQ);
+    setRadius(urlR);
+    setShowAllCalibLevels(urlAllLevels);
+    setRecents(recordRecentSearch({ q: urlQ, r: urlR }));
+    void handleSearch(fieldsFromQuery(parseSearchQuery(urlQ), urlR), urlAllLevels);
+  }, [navKey, urlQ, urlR, urlAllLevels]);
 
   const handleImport = async (obsIdToImport: string) => {
     setImporting(obsIdToImport);
@@ -734,27 +834,19 @@ const MastSearch: React.FC = () => {
         Search the Mikulski Archive for Space Telescopes (MAST) for JWST observations
       </p>
 
-      <SearchForm
-        searchType={searchType}
-        onSearchTypeChange={changeSearchType}
-        targetName={targetName}
-        onTargetNameChange={setTargetName}
-        ra={ra}
-        onRaChange={setRa}
-        dec={dec}
-        onDecChange={setDec}
+      <SmartSearchInput
+        value={query}
+        onChange={setQuery}
         radius={radius}
         onRadiusChange={setRadius}
-        obsId={obsId}
-        onObsIdChange={setObsId}
-        programId={programId}
-        onProgramIdChange={setProgramId}
         showAllCalibLevels={showAllCalibLevels}
-        onShowAllCalibLevelsChange={setShowAllCalibLevels}
-        downloadSource={downloadSource}
-        onDownloadSourceChange={setDownloadSource}
+        onShowAllCalibLevelsChange={(v) => {
+          offerForcedLevelsRef.current = false;
+          setShowAllCalibLevels(v);
+        }}
         loading={loading}
-        onSearch={handleSearch}
+        recents={recents}
+        onSubmit={handleSubmit}
       />
 
       {error && <div className="error-message">{error}</div>}
@@ -774,8 +866,10 @@ const MastSearch: React.FC = () => {
               type="button"
               className="btn-base btn-compact"
               onClick={() => {
-                setShowAllCalibLevels(true);
-                void handleSearch(true);
+                offerForcedLevelsRef.current = true;
+                // Replace (not push) so Back skips the L3-only variant of the
+                // same search; the URL effect re-runs with every level.
+                url.replace({ q: urlQ, r: urlR, allLevels: true });
               }}
               disabled={loading}
             >
@@ -855,6 +949,8 @@ const MastSearch: React.FC = () => {
           importing={importing}
           onImport={handleImport}
           isAuthenticated={isAuthenticated}
+          downloadSource={downloadSource}
+          onDownloadSourceChange={setDownloadSource}
           availability={availability}
           currentPage={currentPage}
           totalPages={totalPages}
