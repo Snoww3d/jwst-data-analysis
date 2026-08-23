@@ -71,6 +71,8 @@ services:
       - PYTHONUNBUFFERED=1
       - MAST_DOWNLOAD_DIR=${MAST_DOWNLOAD_DIR:-/app/data/mast}
       - MAST_DOWNLOAD_TIMEOUT=${MAST_DOWNLOAD_TIMEOUT:-3600}
+      # Max rows per MAST search query; responses carry `truncated` when hit.
+      - MAST_PAGE_SIZE=${MAST_PAGE_SIZE:-500}
       - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
       - STORAGE_BASE_PATH=/app/data
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-jwst-data}

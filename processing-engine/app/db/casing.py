@@ -82,5 +82,5 @@ def snake_to_camel_keys(obj: Any) -> Any:
     return _walk(obj, snake_to_camel, set())
 
 
-def camel_to_snake_keys(obj: Any) -> Any:
-    return _walk(obj, camel_to_snake, set())
+def camel_to_snake_keys(obj: Any, verbatim_keys: set[str] | frozenset[str] = frozenset()) -> Any:
+    return _walk(obj, camel_to_snake, set(verbatim_keys))

@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 import app.mast.routes as engine_mast_routes
 from app.mast.api_routes import router as mast_api_router
+from app.mast.mast_service import MastSearchResult
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -47,19 +48,19 @@ def client(monkeypatch):
             "calib_level": calib_level,
             "filters_seen": filters,
         }
-        return FAKE_ROWS
+        return MastSearchResult(rows=FAKE_ROWS, truncated=calls.get("truncate", False))
 
-    def fake_coords(ra, dec, radius, calib_level):
-        calls["coords"] = {"ra": ra, "dec": dec}
-        return FAKE_ROWS
+    def fake_coords(ra, dec, radius, calib_level, filters, mode):
+        calls["coords"] = {"ra": ra, "dec": dec, "filters_seen": filters, "mode": mode}
+        return MastSearchResult(rows=FAKE_ROWS)
 
     def fake_obs(obs_id, calib_level):
-        calls["obs"] = {"obs_id": obs_id}
-        return FAKE_ROWS
+        calls["obs"] = {"obs_id": obs_id, "calib_level": calib_level}
+        return MastSearchResult(rows=FAKE_ROWS)
 
     def fake_program(program_id, calib_level):
         calls["program"] = {"program_id": program_id}
-        return FAKE_ROWS
+        return MastSearchResult(rows=FAKE_ROWS)
 
     def fake_recent(days_back, instrument, limit, offset):
         calls["recent"] = {
@@ -118,15 +119,43 @@ class TestTargetSearchContract:
         resp = client.post("/api/mast/search/target", json={"targetName": "M16", "radius": 99})
         assert resp.status_code == 400
 
-    def test_filters_injection_stripped(self, client):
+    def test_filters_injection_rejected(self, client):
         # `filters` splats into astroquery query_criteria server-side — the
-        # public edge must drop it (pagesize/obs_collection override vector)
+        # public edge must refuse anything outside the MastCriteria
+        # whitelist (pagesize/obs_collection override vector)
         resp = client.post(
             "/api/mast/search/target",
             json={"targetName": "M16", "filters": {"pagesize": 5000000}},
         )
+        assert resp.status_code == 400
+        assert "target" not in client.calls
+
+    def test_filters_whitelist_passthrough_verbatim_keys(self, client):
+        # CAOM criteria names are data, not DTO properties: intentType must
+        # reach the service un-snake-cased
+        resp = client.post(
+            "/api/mast/search/target",
+            json={
+                "targetName": "M16",
+                "filters": {"instrument_name": ["NIRCAM"], "intentType": ["science"]},
+            },
+        )
         assert resp.status_code == 200
-        assert client.calls["target"].get("filters_seen") is None
+        assert client.calls["target"]["filters_seen"] == {
+            "instrument_name": ["NIRCAM"],
+            "intentType": ["science"],
+        }
+
+    def test_truncated_flag_and_page_size_in_envelope(self, client):
+        client.calls["truncate"] = True
+        resp = client.post("/api/mast/search/target", json={"targetName": "M16"})
+        body = resp.json()
+        assert body["truncated"] is True
+        assert "page_size" in body
+
+    def test_calib_level_defaults_to_level_3(self, client):
+        client.post("/api/mast/search/target", json={"targetName": "M16"})
+        assert client.calls["target"]["calib_level"] == [3]
 
 
 class TestValidationPaths:
@@ -150,14 +179,38 @@ class TestOtherSearchModes:
         )
         assert resp.status_code == 200
         assert resp.json()["search_type"] == "coordinates"
-        assert client.calls["coords"] == {"ra": 10.5, "dec": -60.2}
+        assert client.calls["coords"]["ra"] == 10.5
+        assert client.calls["coords"]["dec"] == -60.2
+        assert client.calls["coords"]["mode"] == "cone"
+        assert resp.json()["truncated"] is False
+
+    def test_coordinates_box_mode_and_filters(self, client):
+        resp = client.post(
+            "/api/mast/search/coordinates",
+            json={"ra": 10.5, "dec": -60.2, "mode": "box", "filters": {"filters": ["F200W"]}},
+        )
+        assert resp.status_code == 200
+        assert client.calls["coords"]["mode"] == "box"
+        assert client.calls["coords"]["filters_seen"] == {"filters": ["F200W"]}
+
+    def test_coordinates_bad_mode_400(self, client):
+        resp = client.post(
+            "/api/mast/search/coordinates", json={"ra": 10.5, "dec": -60.2, "mode": "sphere"}
+        )
+        assert resp.status_code == 400
 
     def test_observation(self, client):
         resp = client.post(
             "/api/mast/search/observation", json={"obsId": "jw02733-o002", "calibLevel": [3]}
         )
         assert resp.status_code == 200
-        assert client.calls["obs"] == {"obs_id": "jw02733-o002"}
+        assert client.calls["obs"]["obs_id"] == "jw02733-o002"
+
+    def test_observation_without_calib_level_uses_model_default(self, client):
+        # obs-id mode sends no calibLevel — the engine model default (None:
+        # every level for a specific obs lookup) applies
+        client.post("/api/mast/search/observation", json={"obsId": "jw02733-o002"})
+        assert client.calls["obs"]["calib_level"] is None
 
     def test_program(self, client):
         resp = client.post(

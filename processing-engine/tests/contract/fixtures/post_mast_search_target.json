@@ -5,7 +5,8 @@
     "radius": 0.2,
     "calib_level": [
       3
-    ]
+    ],
+    "filters": null
   },
   "results": [
     {
@@ -390,5 +391,7 @@
     }
   ],
   "result_count": 10,
-  "timestamp": "2026-07-07T01:40:49.368766+00:00"
+  "timestamp": "2026-07-07T01:40:49.368766+00:00",
+  "truncated": false,
+  "page_size": 500
 }

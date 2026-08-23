@@ -69,13 +69,16 @@ class TestTargetVariantSearch:
                 target_name=target_query, radius=0.2, calib_level=[1, 2, 3]
             )
 
-        assert results == [{"obs_id": "jw-test"}]
+        # row has no s_ra/s_dec -> kept by the cone post-filter
+        assert results.rows == [{"obs_id": "jw-test"}]
+        assert results.truncated is False
         assert any(variant.casefold() == "ngc 3132" for variant in attempted_variants)
 
         kwargs = query_mock.call_args.kwargs
         assert kwargs["obs_collection"] == "JWST"
         assert kwargs["calib_level"] == [1, 2, 3]
-        assert kwargs["s_ra"] == pytest.approx([150.9, 151.3])
+        # RA half-width is cos(dec)-corrected: 0.2 / cos(40.5 deg)
+        assert kwargs["s_ra"] == pytest.approx([151.1 - 0.26304, 151.1 + 0.26304], abs=1e-4)
         assert kwargs["s_dec"] == pytest.approx([-40.7, -40.3])
 
     def test_search_by_target_raises_when_all_variants_fail(self, tmp_path):

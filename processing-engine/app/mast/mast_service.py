@@ -7,16 +7,20 @@ from __future__ import annotations
 
 import errno
 import logging
+import math
 import os
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, angular_separation
 from astroquery.mast import Observations
 
+from app.config import int_env
 from app.exceptions import MASTServiceError
 
 
@@ -37,6 +41,67 @@ def _today_mjd() -> int:
     return (datetime.now(UTC) - _MJD_EPOCH).days
 
 
+@dataclass
+class MastSearchResult:
+    """Rows from one MAST search plus whether the page cap was hit.
+
+    ``truncated`` reflects the raw ``query_criteria`` result (before any
+    cone post-filter): if MAST handed back ``page_size`` rows there may be
+    more it did not return.
+    """
+
+    rows: list[dict[str, Any]] = dc_field(default_factory=list)
+    truncated: bool = False
+    page_size: int = 0
+
+
+def _bbox_criteria(ra: float, dec: float, radius: float) -> dict[str, Any]:
+    """RA/Dec bounding-box ``query_criteria`` kwargs for a cone of ``radius`` deg.
+
+    The RA half-width is widened by 1/cos(dec) so the box still covers the
+    cone near the poles (an uncorrected box narrows to a sliver there).
+    ``query_criteria`` takes a single ``s_ra`` range, so when the widened
+    range would cross RA 0/360 — or the cone reaches a pole, where every
+    RA is inside — ``s_ra`` is dropped and only the dec band is sent; the
+    caller's cone post-filter removes the excess.
+    """
+    dec_lo = max(dec - radius, -90.0)
+    dec_hi = min(dec + radius, 90.0)
+    criteria: dict[str, Any] = {"s_dec": [dec_lo, dec_hi]}
+
+    if abs(dec) + radius >= 90.0:
+        return criteria
+    ra_half = min(radius / max(math.cos(math.radians(dec)), 1e-6), 180.0)
+    ra_lo, ra_hi = ra - ra_half, ra + ra_half
+    if ra_lo < 0.0 or ra_hi > 360.0:
+        return criteria
+    criteria["s_ra"] = [ra_lo, ra_hi]
+    return criteria
+
+
+def _filter_by_separation(
+    rows: list[dict[str, Any]], ra: float, dec: float, radius: float
+) -> list[dict[str, Any]]:
+    """Keep rows whose ``s_ra``/``s_dec`` centre lies within ``radius`` deg.
+
+    Rows missing either coordinate are kept — a bounding-box hit with no
+    position is still a plausible match and dropping on missing data would
+    hide real observations.
+    """
+    ra_rad, dec_rad = math.radians(ra), math.radians(dec)
+    radius_rad = math.radians(radius)
+    kept: list[dict[str, Any]] = []
+    for row in rows:
+        row_ra, row_dec = row.get("s_ra"), row.get("s_dec")
+        if not isinstance(row_ra, int | float) or not isinstance(row_dec, int | float):
+            kept.append(row)
+            continue
+        sep = angular_separation(ra_rad, dec_rad, math.radians(row_ra), math.radians(row_dec))
+        if float(sep) <= radius_rad:
+            kept.append(row)
+    return kept
+
+
 def _convert_mast_uris(rows: list[dict[str, Any]]) -> None:
     """Convert mast: URI scheme fields (jpegURL, dataURL) to downloadable HTTPS URLs.
 
@@ -55,11 +120,11 @@ def _convert_mast_uris(rows: list[dict[str, Any]]) -> None:
 class MastService:
     """Service for interacting with MAST portal via astroquery."""
 
-    # Default page size for MAST queries (astroquery defaults to 10).
-    # When a query returns exactly this many rows, the result is likely
-    # truncated — `_warn_if_truncated` logs a warning so operators can spot
-    # the case in production and tune the limit. (#1221)
-    DEFAULT_PAGE_SIZE = 500
+    # Page size for MAST queries (astroquery defaults to 10). When a query
+    # returns exactly this many rows, the result is likely truncated —
+    # `_warn_if_truncated` logs a warning and the flag is surfaced on the
+    # response so the client can say so. Tunable via MAST_PAGE_SIZE. (#1221)
+    DEFAULT_PAGE_SIZE = int_env("MAST_PAGE_SIZE", 500)
 
     # Valid MAST data URI pattern: mast:{collection}/product/{filename}
     # Only allows alphanumeric, underscores, hyphens, dots, forward slashes, and colons
@@ -72,23 +137,33 @@ class MastService:
     MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
 
     @classmethod
-    def _warn_if_truncated(cls, obs_table, search_description: str) -> None:
+    def _warn_if_truncated(cls, obs_table, search_description: str) -> bool:
         """Log a clear warning when a result set is likely truncated. (#1221)
 
         Astroquery's ``Observations.query_criteria`` returns at most
         ``pagesize`` rows; if we asked for ``DEFAULT_PAGE_SIZE`` and got
         exactly that many back, the next page worth of results is silently
-        cut off. Surfacing this in logs lets operators spot the case in
-        production and tune the limit before users hit it.
+        cut off. Returns True in that case so callers can flag it on the
+        response; the log line lets operators spot it in production.
         """
         if len(obs_table) >= cls.DEFAULT_PAGE_SIZE:
             logger.warning(
                 "MAST results may be truncated at pagesize=%d for %s — "
                 "consider narrowing filters (calib_level, instrument) "
-                "or raising DEFAULT_PAGE_SIZE.",
+                "or raising MAST_PAGE_SIZE.",
                 cls.DEFAULT_PAGE_SIZE,
                 search_description,
             )
+            return True
+        return False
+
+    def _search_result(self, obs_table, search_description: str) -> MastSearchResult:
+        truncated = self._warn_if_truncated(obs_table, search_description)
+        return MastSearchResult(
+            rows=self._table_to_dict_list(obs_table),
+            truncated=truncated,
+            page_size=self.DEFAULT_PAGE_SIZE,
+        )
 
     # Target normalization patterns for resilient name resolution
     TARGET_SEPARATOR_PATTERN = re.compile(r"[-_\s]+")
@@ -239,6 +314,40 @@ class MastService:
                 download_dir,
             )
 
+    def _search_cone(
+        self,
+        ra: float,
+        dec: float,
+        radius: float,
+        filters: dict[str, Any] | None,
+        calib_level: list[int] | None,
+        exclude_proprietary: bool,
+        mode: str,
+        search_description: str,
+    ) -> MastSearchResult:
+        """Shared body of target and coordinate search: bbox query, cone post-filter."""
+        query_params: dict[str, Any] = {
+            "obs_collection": "JWST",
+            **_bbox_criteria(ra, dec, radius),
+            "pagesize": self.DEFAULT_PAGE_SIZE,
+        }
+        if calib_level:
+            query_params["calib_level"] = calib_level
+        if exclude_proprietary:
+            query_params["t_obs_release"] = [0, _today_mjd()]
+        # Caller-supplied filters (already whitelisted at the API edge —
+        # see MastCriteria) narrow the query, e.g. instrument_name=NIRCAM.
+        if filters:
+            query_params.update(filters)
+        obs_table = Observations.query_criteria(**query_params)
+
+        logger.info(f"Found {len(obs_table)} JWST observations")
+        result = self._search_result(obs_table, search_description)
+        if mode == "cone":
+            result.rows = _filter_by_separation(result.rows, ra, dec, radius)
+            logger.info(f"{len(result.rows)} within {radius} deg cone")
+        return result
+
     def search_by_target(
         self,
         target_name: str,
@@ -246,22 +355,23 @@ class MastService:
         filters: dict[str, Any] | None = None,
         calib_level: list[int] | None = None,
         exclude_proprietary: bool = True,
-    ) -> list[dict[str, Any]]:
+    ) -> MastSearchResult:
         """
         Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula').
 
         Uses a two-step approach for better performance:
         1. Resolve target name to coordinates using Simbad/NED
-        2. Query MAST with coordinate-based criteria filter
+        2. Query MAST with coordinate-based criteria filter, then keep
+           observations centred within `radius` of the target (cone)
 
         Args:
             target_name: Astronomical object name
             radius: Search radius in degrees
-            filters: Additional query filters
+            filters: Additional whitelisted query criteria
             calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels).
 
         Returns:
-            List of observation dictionaries
+            MastSearchResult with observation dictionaries and truncation flag
         """
         try:
             normalized_target_name = self._collapse_whitespace(target_name)
@@ -279,24 +389,16 @@ class MastService:
             )
 
             # Step 2: Query MAST with coordinate box filter (much faster than query_object)
-            query_params: dict[str, Any] = {
-                "obs_collection": "JWST",
-                "s_ra": [coord.ra.deg - radius, coord.ra.deg + radius],
-                "s_dec": [coord.dec.deg - radius, coord.dec.deg + radius],
-                "pagesize": self.DEFAULT_PAGE_SIZE,
-            }
-            if calib_level:
-                query_params["calib_level"] = calib_level
-            if exclude_proprietary:
-                query_params["t_obs_release"] = [0, _today_mjd()]
-            # Caller-supplied filters override the above (e.g. instrument=NIRCAM).
-            if filters:
-                query_params.update(filters)
-            obs_table = Observations.query_criteria(**query_params)
-
-            logger.info(f"Found {len(obs_table)} JWST observations")
-            self._warn_if_truncated(obs_table, "target/coordinate search")
-            return self._table_to_dict_list(obs_table)
+            return self._search_cone(
+                coord.ra.deg,
+                coord.dec.deg,
+                radius,
+                filters,
+                calib_level,
+                exclude_proprietary,
+                mode="cone",
+                search_description="target/coordinate search",
+            )
         except Exception as e:
             logger.error(f"MAST target search failed: {e}")
             raise MASTServiceError(str(e)) from e
@@ -308,7 +410,9 @@ class MastService:
         radius: float = 0.2,
         calib_level: list[int] | None = None,
         exclude_proprietary: bool = True,
-    ) -> list[dict[str, Any]]:
+        filters: dict[str, Any] | None = None,
+        mode: str = "cone",
+    ) -> MastSearchResult:
         """
         Search MAST by RA/Dec coordinates.
 
@@ -317,38 +421,34 @@ class MastService:
             dec: Declination in degrees
             radius: Search radius in degrees
             calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels).
+            filters: Additional whitelisted query criteria
+            mode: 'cone' (centre within radius) or 'box' (raw bounding-box hits)
 
         Returns:
-            List of observation dictionaries
+            MastSearchResult with observation dictionaries and truncation flag
         """
         try:
             logger.info(
-                f"Searching MAST at RA={ra}, Dec={dec}, radius={radius} deg, calib_level: {calib_level}"
+                f"Searching MAST at RA={ra}, Dec={dec}, radius={radius} deg, "
+                f"calib_level: {calib_level}, mode: {mode}"
             )
-
-            # Use query_criteria instead of query_region to support calib_level filter
-            query_params: dict[str, Any] = {
-                "obs_collection": "JWST",
-                "s_ra": [ra - radius, ra + radius],
-                "s_dec": [dec - radius, dec + radius],
-                "pagesize": self.DEFAULT_PAGE_SIZE,
-            }
-            if calib_level:
-                query_params["calib_level"] = calib_level
-            if exclude_proprietary:
-                query_params["t_obs_release"] = [0, _today_mjd()]
-            obs_table = Observations.query_criteria(**query_params)
-
-            logger.info(f"Found {len(obs_table)} JWST observations")
-            self._warn_if_truncated(obs_table, "target/coordinate search")
-            return self._table_to_dict_list(obs_table)
+            return self._search_cone(
+                ra,
+                dec,
+                radius,
+                filters,
+                calib_level,
+                exclude_proprietary,
+                mode=mode,
+                search_description="target/coordinate search",
+            )
         except Exception as e:
             logger.error(f"MAST coordinate search failed: {e}")
             raise MASTServiceError(str(e)) from e
 
     def search_by_observation_id(
         self, obs_id: str, calib_level: list[int] | None = None, exclude_proprietary: bool = True
-    ) -> list[dict[str, Any]]:
+    ) -> MastSearchResult:
         """
         Search MAST by observation ID.
 
@@ -357,7 +457,7 @@ class MastService:
             calib_level: List of calibration levels to include. Default None (all levels).
 
         Returns:
-            List of observation dictionaries
+            MastSearchResult with observation dictionaries and truncation flag
         """
         try:
             calib_level_str = str(calib_level) if calib_level else "all"
@@ -379,8 +479,7 @@ class MastService:
 
             obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
-            self._warn_if_truncated(obs_table, "observation/program search")
-            return self._table_to_dict_list(obs_table)
+            return self._search_result(obs_table, "observation/program search")
         except Exception as e:
             logger.error(f"MAST observation ID search failed: {e}")
             raise MASTServiceError(str(e)) from e
@@ -390,7 +489,7 @@ class MastService:
         program_id: str,
         calib_level: list[int] | None = None,
         exclude_proprietary: bool = True,
-    ) -> list[dict[str, Any]]:
+    ) -> MastSearchResult:
         """
         Search MAST by program/proposal ID.
 
@@ -399,7 +498,7 @@ class MastService:
             calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels).
 
         Returns:
-            List of observation dictionaries
+            MastSearchResult with observation dictionaries and truncation flag
         """
         try:
             logger.info(f"Searching MAST for program ID: {program_id}, calib_level: {calib_level}")
@@ -414,8 +513,7 @@ class MastService:
                 query_params["t_obs_release"] = [0, _today_mjd()]
             obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
-            self._warn_if_truncated(obs_table, "observation/program search")
-            return self._table_to_dict_list(obs_table)
+            return self._search_result(obs_table, "observation/program search")
         except Exception as e:
             logger.error(f"MAST program ID search failed: {e}")
             raise MASTServiceError(str(e)) from e

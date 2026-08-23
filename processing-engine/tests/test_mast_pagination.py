@@ -121,7 +121,7 @@ class TestWarnIfTruncated:
 
         table = _make_obs_table(MastService.DEFAULT_PAGE_SIZE)
         with caplog.at_level(logging.WARNING, logger="app.mast.mast_service"):
-            MastService._warn_if_truncated(table, "test search")
+            assert MastService._warn_if_truncated(table, "test search") is True
         assert any("may be truncated" in r.message for r in caplog.records)
         assert any("test search" in r.message for r in caplog.records)
 
@@ -130,7 +130,7 @@ class TestWarnIfTruncated:
 
         table = _make_obs_table(MastService.DEFAULT_PAGE_SIZE - 1)
         with caplog.at_level(logging.WARNING, logger="app.mast.mast_service"):
-            MastService._warn_if_truncated(table, "test search")
+            assert MastService._warn_if_truncated(table, "test search") is False
         assert not any("may be truncated" in r.message for r in caplog.records)
 
     def test_no_warning_on_empty(self, caplog):

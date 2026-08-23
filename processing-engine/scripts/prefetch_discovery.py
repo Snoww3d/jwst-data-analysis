@@ -336,7 +336,7 @@ def run_pipeline(args: argparse.Namespace) -> list[TargetReport]:
 
         # Step 1: Search MAST
         try:
-            observations = mast.search_by_target(search_target, calib_level=[3])
+            observations = mast.search_by_target(search_target, calib_level=[3]).rows
         except Exception as e:
             report.errors.append(f"MAST search failed: {e}")
             logger.error("  MAST search failed: %s", e)
@@ -347,7 +347,7 @@ def run_pipeline(args: argparse.Namespace) -> list[TargetReport]:
         if not observations:
             # Fall back to level 2
             try:
-                observations = mast.search_by_target(search_target, calib_level=[2])
+                observations = mast.search_by_target(search_target, calib_level=[2]).rows
                 logger.info("  Fallback: found %d level-2 observations", len(observations))
             except Exception as e:
                 report.errors.append(f"MAST search (level-2 fallback) failed: {e}")
