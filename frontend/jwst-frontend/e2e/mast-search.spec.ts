@@ -136,11 +136,16 @@ const ALADIN_STUB = `window.A = {
     on() {}, addOverlay() {}, addMOC() {}, gotoRaDec() {}, setFoV() {},
     getFov: () => [180, 90], getRaDec: () => [0, 0], getSize: () => [800, 600],
     setBaseImageLayer() {}, setProjection() {},
+    select() {}, fire() {},
+    pix2world: (x, y) => [x / 10, y / 10],
+    angularDist: (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1) / 10,
   }),
   graphicOverlay: () => ({ addFootprints() {}, removeAll() {}, reportChange() {} }),
   footprintsFromSTCS: () => [],
   MOCFromJSON: () => ({ show() {}, hide() {} }),
   HiPS: (id) => ({ id }),
+  polygon: () => ({}),
+  circle: () => ({}),
 };`;
 
 const CARINA_ROW = {
@@ -229,5 +234,38 @@ test.describe('MAST search sky map (Phase 5)', () => {
     await expect(row).toHaveClass(/highlighted/);
     await page.locator('.results-count').hover();
     await expect(row).not.toHaveClass(/highlighted/);
+  });
+
+  test('region deep link shows only the clipped rows and the removable chip (Phase 6)', async ({
+    page,
+  }) => {
+    const FAR_ROW = {
+      ...CARINA_ROW,
+      obs_id: 'jw-far-away',
+      target_name: 'Far away',
+      s_region: 'POLYGON 10.0 10.0 10.1 10.0 10.1 10.1 10.0 10.1',
+    };
+    await page.route('**/api/mast/search/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          search_type: 'coordinates',
+          results: [CARINA_ROW, FAR_ROW],
+          result_count: 2,
+        }),
+      })
+    );
+    // A polygon around the Carina footprint; the far row is clipped away.
+    await page.goto('/search?region=poly:151.6,-40.5;151.9,-40.5;151.9,-40.3;151.6,-40.3');
+    await expect(page.getByText('Search Results (1)')).toBeVisible();
+    await expect(page.getByText('REGION: POLYGON · 4 VTX', { exact: false })).toBeVisible();
+    await expect(page.locator(`#obs-${CARINA_ROW.obs_id}`)).toBeVisible();
+    await expect(page.locator('#obs-jw-far-away')).toBeHidden();
+
+    // Removing the chip clears the region and returns to the empty state.
+    await page.getByRole('button', { name: 'Remove the drawn region' }).click();
+    await expect(page).not.toHaveURL(/region=/);
+    await expect(page.getByText('Explore the JWST sky')).toBeVisible();
   });
 });
