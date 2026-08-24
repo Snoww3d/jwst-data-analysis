@@ -52,6 +52,12 @@ export interface SearchByCoordinatesParams {
   calibLevel?: number[];
   /** Whitelisted CAOM criteria (filter rail, Phase 4). */
   filters?: MastCriteria;
+  /**
+   * `cone` (default) keeps the server's centre-in-cone post-filter; `box`
+   * returns the raw bbox rows for client-side clipping (draw-to-search,
+   * Phase 6).
+   */
+  mode?: 'cone' | 'box';
 }
 
 export interface SearchByFacetsParams {
@@ -170,7 +176,7 @@ export async function searchByCoordinates(
   signal?: AbortSignal,
   options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  const cacheKey = `${SEARCH_CACHE_PREFIX}coords:${params.ra}:${params.dec}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}:${filtersKey(params.filters)}`;
+  const cacheKey = `${SEARCH_CACHE_PREFIX}coords:${params.ra}:${params.dec}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}:${filtersKey(params.filters)}:${params.mode ?? 'cone'}`;
   return cachedSearch(
     cacheKey,
     () =>
@@ -182,6 +188,7 @@ export async function searchByCoordinates(
           radius: params.radius,
           calibLevel: params.calibLevel,
           filters: params.filters,
+          mode: params.mode,
         },
         { signal }
       ),

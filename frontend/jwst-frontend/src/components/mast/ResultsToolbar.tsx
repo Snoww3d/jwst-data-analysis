@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import type { DownloadSource } from '../../services';
 import type { SearchView } from '../../hooks/useSearchUrlState';
 import { CE_MODE } from '../../config/ce';
+import { describeRegion, type SkyRegion } from '../../utils/skyGeometry';
 import { RESULT_COLUMNS } from './resultColumns';
 import type { AvailabilityStatus } from './hooks/useLibraryAvailability';
 import ImportOptionsPopover from './ImportOptionsPopover';
@@ -25,13 +26,23 @@ interface ResultsToolbarProps {
   onViewChange: (view: SearchView) => void;
   /** Re-centre the sky map on the current results (split view only). */
   onFitMap?: () => void;
+  /** The drawn region the results were clipped to (draw-to-search, Phase 6). */
+  region?: SkyRegion;
+  /** Rows kept although their footprint could not be parsed. */
+  unclippable?: number;
+  /** Remove the region chip: clears the region, runs nothing new. */
+  onRegionClear?: () => void;
 }
 
 /** "Showing first N" — the server capped the result set. */
-export const TruncationBanner: React.FC<{ pageSize: number }> = ({ pageSize }) => (
+export const TruncationBanner: React.FC<{ pageSize: number; region?: boolean }> = ({
+  pageSize,
+  region = false,
+}) => (
   <div className="truncation-banner" role="status">
-    Showing the first {pageSize} observations MAST returned — there are more. Narrow the radius or
-    add filters to see the rest.
+    {region
+      ? `The region query hit the ${pageSize} cap — results may be incomplete. Shrink the region.`
+      : `Showing the first ${pageSize} observations MAST returned — there are more. Narrow the radius or add filters to see the rest.`}
   </div>
 );
 
@@ -57,6 +68,9 @@ const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
   view,
   onViewChange,
   onFitMap,
+  region,
+  unclippable,
+  onRegionClear,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -96,6 +110,29 @@ const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
             <span className="results-selected"> · {selectedCount} selected</span>
           )}
         </h3>
+
+        {region && (
+          <span className="region-chip">
+            <span className="region-chip-label">REGION: {describeRegion(region)}</span>
+            {onRegionClear && (
+              <button
+                type="button"
+                className="region-chip-remove"
+                onClick={onRegionClear}
+                aria-label="Remove the drawn region"
+                title="Remove the drawn region"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        )}
+
+        {region && (unclippable ?? 0) > 0 && (
+          <span className="results-availability-note" role="status">
+            {unclippable} without a readable footprint kept.
+          </span>
+        )}
 
         {availabilityStatus === 'unavailable' && (
           <span className="results-availability-note" role="status">
@@ -191,7 +228,7 @@ const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
         </div>
       </div>
 
-      {truncated && <TruncationBanner pageSize={pageSize} />}
+      {truncated && <TruncationBanner pageSize={pageSize} region={Boolean(region)} />}
     </div>
   );
 };

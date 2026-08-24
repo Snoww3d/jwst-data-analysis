@@ -139,4 +139,29 @@ describe('ResultsToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fit map to results' }));
     expect(baseProps.onFitMap).toHaveBeenCalled();
   });
+
+  describe('drawn region (draw-to-search, Phase 6)', () => {
+    const region = { kind: 'circle' as const, ra: 100, dec: -30, r: 0.5 };
+
+    it('shows the removable region chip and the unclippable note', () => {
+      const onRegionClear = vi.fn();
+      renderToolbar({ region, unclippable: 3, onRegionClear } as never);
+      expect(screen.getByText('REGION: CIRCLE · R 0.50°')).toBeInTheDocument();
+      expect(screen.getByText('3 without a readable footprint kept.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Remove the drawn region' }));
+      expect(onRegionClear).toHaveBeenCalled();
+    });
+
+    it('no chip and no note without a region', () => {
+      renderToolbar({ unclippable: 3 } as never);
+      expect(screen.queryByText(/REGION:/)).toBeNull();
+      expect(screen.queryByText(/without a readable footprint/)).toBeNull();
+    });
+
+    it('the truncation banner speaks region during a region search', () => {
+      renderToolbar({ region, truncated: true, pageSize: 500 } as never);
+      expect(screen.getByText(/region query hit the 500 cap/)).toBeInTheDocument();
+      expect(screen.queryByText(/Narrow the radius/)).toBeNull();
+    });
+  });
 });

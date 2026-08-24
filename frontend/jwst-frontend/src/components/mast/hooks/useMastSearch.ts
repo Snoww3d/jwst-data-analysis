@@ -7,6 +7,7 @@ import type {
 import { mastService, ApiError } from '../../../services';
 import type { ParsedQuery } from '../../../utils/searchQueryParser';
 import type { MastCriteria } from '../../../utils/mastCriteria';
+import { boundingCircle, clipResults, type SkyRegion } from '../../../utils/skyGeometry';
 
 export const SEARCH_TIMEOUT_MS = 120_000; // 2 minutes
 /** Server row cap assumed when the response predates Phase 0's `page_size`. */
@@ -46,6 +47,10 @@ export interface SearchOutcome {
    * because neither a date facet nor `daysBack` was sent.
    */
   defaultWindowApplied: boolean;
+  /** The drawn region the rows were clipped to (draw-to-search, Phase 6). */
+  region?: SkyRegion;
+  /** Rows kept although their `s_region` could not be parsed (region searches). */
+  unclippable?: number;
 }
 
 export type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
@@ -65,6 +70,12 @@ export interface RunOptions {
   filters?: MastCriteria;
   /** Facet-only runs: explicit release window in days (absent → server default). */
   daysBack?: number;
+  /**
+   * Drawn sky region (Phase 6). Runs as a bounding-circle bbox query
+   * (`mode:'box'`) and clips the response client-side; `parsed` must be
+   * null. The outcome's rows/count are post-clip.
+   */
+  region?: SkyRegion;
   /**
    * Identity of the search for the history cache (the search-defining URL
    * params). A run whose key is already cached restores that outcome
@@ -129,6 +140,21 @@ function query(
   signal: AbortSignal
 ): Promise<MastSearchResponse> {
   const calibLevel = calibLevelsFor(opts);
+  if (parsed === null && opts.region) {
+    const bc = boundingCircle(opts.region);
+    if (!bc) return Promise.reject(new Error('The drawn region is degenerate — draw it again.'));
+    return mastService.searchByCoordinates(
+      {
+        ra: bc.ra,
+        dec: bc.dec,
+        radius: bc.radius,
+        calibLevel,
+        filters: opts.filters,
+        mode: 'box',
+      },
+      signal
+    );
+  }
   if (parsed === null) {
     return mastService.searchByFacets(
       { filters: opts.filters, calibLevel, daysBack: opts.daysBack },
@@ -226,19 +252,31 @@ export function useMastSearch(): UseMastSearchResult {
       clearTimeout(timeoutId);
       if (!isCurrent()) return;
 
-      const rows = Array.isArray(data.results) ? data.results : [];
+      const raw = Array.isArray(data.results) ? data.results : [];
+      const region = parsed === null ? opts.region : undefined;
+      // Region searches show only the rows whose footprint intersects the
+      // drawn shape; `truncated` keeps the server's meaning (the bbox hit
+      // the cap), so the banner can say the region may be incomplete.
+      const clipped = region ? clipResults(raw, region) : null;
+      const rows = clipped ? clipped.rows : raw;
       const pageSize = data.page_size ?? DEFAULT_PAGE_SIZE;
       const levels = calibLevelsFor(opts);
       const next: SearchOutcome = {
         rows,
         count: rows.length,
-        truncated: data.truncated ?? rows.length >= pageSize,
+        truncated: data.truncated ?? raw.length >= pageSize,
         pageSize,
-        searchType: parsed === null ? 'facets' : SEARCH_TYPE_FOR_KIND[parsed.kind],
+        searchType: region
+          ? 'coordinates'
+          : parsed === null
+            ? 'facets'
+            : SEARCH_TYPE_FOR_KIND[parsed.kind],
         ranAt: Date.now(),
         query: parsed,
         level3Only: parsed?.kind !== 'obsId' && levels.length === 1 && levels[0] === 3,
-        defaultWindowApplied: parsed === null && data.default_window_applied === true,
+        defaultWindowApplied: parsed === null && !region && data.default_window_applied === true,
+        region,
+        unclippable: clipped?.unclippable,
       };
       if (opts.historyKey) remember(opts.historyKey, next);
       setOutcome(next);

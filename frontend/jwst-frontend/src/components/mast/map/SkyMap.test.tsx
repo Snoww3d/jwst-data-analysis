@@ -1,6 +1,6 @@
 import type { AladinOptions } from '../../../types/aladin-lite';
 import { createRef } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SkyMap, { coverageTiers, type SkyMapHandle } from './SkyMap';
 import { AladinLoadError } from '../../../lib/loadAladin';
@@ -30,6 +30,13 @@ function makeStubA() {
     getSize: vi.fn(() => [800, 600]),
     setBaseImageLayer: vi.fn(),
     setProjection: vi.fn(),
+    // Draw-to-search (Phase 6): pixel→sky is a simple linear map for tests.
+    select: vi.fn(),
+    fire: vi.fn(),
+    pix2world: vi.fn((x: number, y: number) => [x / 10, y / 10]),
+    angularDist: vi.fn(
+      (x1: number, y1: number, x2: number, y2: number) => Math.hypot(x2 - x1, y2 - y1) / 10
+    ),
   };
   const A = {
     init: Promise.resolve(),
@@ -118,8 +125,8 @@ describe('SkyMap', () => {
       cooFrame: 'ICRS',
       fov: 180,
     });
-    // two overlays: footprints + emphasis
-    expect(stub.aladin.addOverlay).toHaveBeenCalledTimes(2);
+    // three overlays: footprints + emphasis + region (Phase 6)
+    expect(stub.aladin.addOverlay).toHaveBeenCalledTimes(3);
     const footprints = stub.overlays.find((o) => o.name === 'mast-footprints')!;
     expect(footprints.items).toHaveLength(2); // the row without s_region is skipped
     const [miri, nircam] = footprints.items as {
@@ -233,5 +240,106 @@ describe('SkyMap', () => {
   it('coverageTiers buckets by count and drops empty tiers', () => {
     const tiers = coverageTiers({ nside: 32, cells: [[7, 2]] });
     expect(tiers).toEqual([{ json: { '5': [7] }, opacity: 0.2 }]);
+  });
+
+  describe('draw-to-search (Phase 6)', () => {
+    async function renderWithDraw(extra: Record<string, unknown> = {}) {
+      const stub = makeStubA();
+      loadAladinMock.mockResolvedValue(stub.A);
+      const onRegionDrawn = vi.fn();
+      render(<SkyMap onRegionDrawn={onRegionDrawn} {...extra} />);
+      await waitFor(() => expect(screen.getByLabelText('Background survey')).toBeInTheDocument());
+      return { stub, onRegionDrawn };
+    }
+
+    it('shows no draw buttons without onRegionDrawn', async () => {
+      const stub = makeStubA();
+      loadAladinMock.mockResolvedValue(stub.A);
+      render(<SkyMap />);
+      await waitFor(() => expect(screen.getByLabelText('Background survey')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Circle' })).toBeNull();
+    });
+
+    it('circle draw: converts the pixel selection and reports a circle region', async () => {
+      const { stub, onRegionDrawn } = await renderWithDraw();
+      fireEvent.click(screen.getByRole('button', { name: 'Circle' }));
+      expect(stub.aladin.select).toHaveBeenCalledWith('circle', expect.any(Function));
+      const cb = stub.aladin.select.mock.calls[0][1] as (sel: unknown) => void;
+      act(() => cb({ x: 100, y: 50, r: 20 }));
+      expect(onRegionDrawn).toHaveBeenCalledWith({ kind: 'circle', ra: 10, dec: 5, r: 2 });
+      // Draw mode ended: the hint is gone.
+      expect(screen.queryByText(/draw a circle/i)).toBeNull();
+    });
+
+    it('polygon draw: converts vertices and drops the repeated closing vertex', async () => {
+      const { stub, onRegionDrawn } = await renderWithDraw();
+      fireEvent.click(screen.getByRole('button', { name: 'Polygon' }));
+      expect(stub.aladin.select).toHaveBeenCalledWith('poly', expect.any(Function));
+      const cb = stub.aladin.select.mock.calls[0][1] as (sel: unknown) => void;
+      act(() =>
+        cb({
+          vertices: [
+            { x: 100, y: 50 },
+            { x: 110, y: 50 },
+            { x: 105, y: 60 },
+            { x: 105, y: 60 },
+          ],
+        })
+      );
+      expect(onRegionDrawn).toHaveBeenCalledWith({
+        kind: 'polygon',
+        vertices: [
+          { ra: 10, dec: 5 },
+          { ra: 11, dec: 5 },
+          { ra: 10.5, dec: 6 },
+        ],
+      });
+    });
+
+    it('a degenerate polygon (fewer than 3 distinct vertices) reports nothing', async () => {
+      const { stub, onRegionDrawn } = await renderWithDraw();
+      fireEvent.click(screen.getByRole('button', { name: 'Polygon' }));
+      const cb = stub.aladin.select.mock.calls[0][1] as (sel: unknown) => void;
+      act(() =>
+        cb({
+          vertices: [
+            { x: 1, y: 1 },
+            { x: 1, y: 1 },
+            { x: 2, y: 2 },
+          ],
+        })
+      );
+      expect(onRegionDrawn).not.toHaveBeenCalled();
+    });
+
+    it('Escape cancels the draw via fire("default")', async () => {
+      const { stub, onRegionDrawn } = await renderWithDraw();
+      fireEvent.click(screen.getByRole('button', { name: 'Polygon' }));
+      expect(screen.getByText(/click to add vertices/i)).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(stub.aladin.fire).toHaveBeenCalledWith('default');
+      expect(onRegionDrawn).not.toHaveBeenCalled();
+      expect(screen.queryByText(/click to add vertices/i)).toBeNull();
+    });
+
+    it('renders the region prop on its own overlay and Clear reports onRegionClear', async () => {
+      const stub = makeStubA();
+      loadAladinMock.mockResolvedValue(stub.A);
+      const onRegionClear = vi.fn();
+      stub.A.circle.mockReturnValue({ kind: 'stub-circle' });
+      render(
+        <SkyMap
+          onRegionDrawn={vi.fn()}
+          onRegionClear={onRegionClear}
+          region={{ kind: 'circle', ra: 10, dec: 5, r: 2 }}
+        />
+      );
+      await waitFor(() => expect(screen.getByLabelText('Background survey')).toBeInTheDocument());
+      expect(stub.A.circle).toHaveBeenCalledWith(10, 5, 2, expect.any(Object));
+      const regionOverlay = stub.overlays.find((o) => o.name === 'mast-region');
+      expect(regionOverlay?.items).toContainEqual({ kind: 'stub-circle' });
+      fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+      expect(onRegionClear).toHaveBeenCalled();
+    });
   });
 });

@@ -35,6 +35,7 @@ const hoisted = vi.hoisted(() => ({
   // The lazy SkyMap is stubbed: record the latest props so tests can drive
   // onHover/onClick and inspect what the page passes down.
   skyMapProps: { current: null as Record<string, unknown> | null },
+  toastWarningMock: vi.fn(),
 }));
 
 vi.mock('./map/SkyMap', async () => {
@@ -82,6 +83,15 @@ vi.mock('../../services', () => ({
 
 vi.mock('../../context/useAuth', () => ({
   useAuth: hoisted.useAuthMock,
+}));
+
+vi.mock('../ui/toast', () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    warning: hoisted.toastWarningMock,
+    error: vi.fn(),
+  }),
+  ToastProvider: () => null,
 }));
 
 vi.mock('../../context/useActiveImportsContext', () => ({
@@ -530,6 +540,94 @@ describe('MastSearch', () => {
       await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalled());
       // during a search the chips render below
       expect(document.querySelector('.smart-search-recents-below')).not.toBeNull();
+    });
+  });
+
+  describe('draw-to-search (MAST Search v2, Phase 6)', () => {
+    const REGION = {
+      kind: 'polygon' as const,
+      vertices: [
+        { ra: 99, dec: -31 },
+        { ra: 101, dec: -31 },
+        { ra: 101, dec: -29 },
+        { ra: 99, dec: -29 },
+      ],
+    };
+    const IN_ROW = {
+      obs_id: 'in-region',
+      s_region: 'POLYGON 99.9 -30.1 100.1 -30.1 100.1 -29.9 99.9 -29.9',
+    };
+    const OUT_ROW = {
+      obs_id: 'out-of-region',
+      s_region: 'POLYGON 119.9 -30.1 120.1 -30.1 120.1 -29.9 119.9 -29.9',
+    };
+    const BLIND_ROW = { obs_id: 'no-footprint' };
+
+    beforeEach(() => {
+      hoisted.toastWarningMock.mockClear();
+    });
+
+    it('drawing on the browse map runs a mode:box search and shows the clipped rows + chip', async () => {
+      vi.mocked(mastService.searchByCoordinates).mockResolvedValue({
+        results: [IN_ROW, OUT_ROW, BLIND_ROW],
+      } as never);
+      renderMastSearch();
+      await waitFor(() => expect(hoisted.skyMapProps.current?.onRegionDrawn).toBeTruthy());
+      act(() => (hoisted.skyMapProps.current!.onRegionDrawn as (r: unknown) => void)(REGION));
+      await waitFor(() => expect(mastService.searchByCoordinates).toHaveBeenCalledTimes(1));
+      const call = vi.mocked(mastService.searchByCoordinates).mock.lastCall?.[0];
+      expect(call?.mode).toBe('box');
+      expect(call?.ra).toBeCloseTo(100, 1);
+      expect(call?.dec).toBeCloseTo(-30, 1);
+      // clipped: the out-of-region row is gone, the footprint-less row kept
+      await waitFor(() => expect(screen.getByText('Search Results (2)')).toBeInTheDocument());
+      expect(screen.getByText(/REGION: POLYGON · 4 VTX/)).toBeInTheDocument();
+      expect(screen.getByText('1 without a readable footprint kept.')).toBeInTheDocument();
+    });
+
+    it('a region deep link auto-runs and the truncation banner speaks region', async () => {
+      vi.mocked(mastService.searchByCoordinates).mockResolvedValue({
+        results: [IN_ROW, OUT_ROW],
+        truncated: true,
+        page_size: 2,
+      } as never);
+      renderMastSearch(['/search?region=poly:99,-31;101,-31;101,-29;99,-29']);
+      await waitFor(() => expect(mastService.searchByCoordinates).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByText('Search Results (1)')).toBeInTheDocument());
+      expect(screen.getByText(/region query hit the 2 cap/)).toBeInTheDocument();
+    });
+
+    it('rejects an oversize drawn region with a toast and runs nothing', async () => {
+      renderMastSearch();
+      await waitFor(() => expect(hoisted.skyMapProps.current?.onRegionDrawn).toBeTruthy());
+      act(() =>
+        (hoisted.skyMapProps.current!.onRegionDrawn as (r: unknown) => void)({
+          kind: 'circle',
+          ra: 100,
+          dec: -30,
+          r: 15,
+        })
+      );
+      expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+        'Draw a smaller region',
+        expect.any(Object)
+      );
+      expect(mastService.searchByCoordinates).not.toHaveBeenCalled();
+      // still browsing
+      expect(screen.getByText('Explore the JWST sky')).toBeInTheDocument();
+    });
+
+    it('removing the region chip clears the region and runs nothing new', async () => {
+      vi.mocked(mastService.searchByCoordinates).mockResolvedValue({
+        results: [IN_ROW],
+      } as never);
+      renderMastSearch(['/search?region=circle:100,-30,1.5']);
+      await waitFor(() => expect(screen.getByText(/REGION: CIRCLE · R 1.50°/)).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'Remove the drawn region' }));
+      // back to the browse empty state, with no second query
+      await waitFor(() => expect(screen.getByText('Explore the JWST sky')).toBeInTheDocument());
+      expect(mastService.searchByCoordinates).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(/REGION:/)).toBeNull();
     });
   });
 

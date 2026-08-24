@@ -21,6 +21,7 @@ import {
   type RecentSearch,
 } from '../../utils/recentSearches';
 import { EmptyState } from '../ui/EmptyState';
+import { toast } from '../ui/toast';
 import { SplitView } from '../ui/SplitView';
 import WhatsNewPanel from '../WhatsNewPanel';
 import SmartSearchInput from './SmartSearchInput';
@@ -39,6 +40,7 @@ import { useCoverage } from './hooks/useCoverage';
 import { loadVisibleColumns, saveVisibleColumns } from './resultColumns';
 import { parseSortParam, toSortParam } from './resultSort';
 import { footprintCentroid, parseStcs } from './map/footprints';
+import { regionTooLarge, type SkyRegion } from '../../utils/skyGeometry';
 import { ang2pixNest } from './map/healpix';
 import type { SkyMapHandle, SkyView } from './map/SkyMap';
 import './MastSearch.css';
@@ -139,11 +141,12 @@ const MastSearch: React.FC = () => {
   /** The URL state for a submit: the typed query + radius + the draft facets. */
   const { sort: urlSort, view: urlView, push: urlPush } = url;
   const nextUrlState = useCallback(
-    (q: string, r: string, facets: FacetState): SearchUrlState => ({
+    (q: string, r: string, facets: FacetState, region?: SkyRegion): SearchUrlState => ({
       q,
       r,
       allLevels: includesAllLevels(facets.calibLevels),
       facets,
+      region,
       sort: urlSort,
       view: urlView,
     }),
@@ -154,7 +157,9 @@ const MastSearch: React.FC = () => {
    *  effect below runs the search, so Back/Forward and deep links share one path. */
   const handleSubmit = (rawQuery: string, rawRadius: string, facets: FacetState = draft) => {
     const q = rawQuery.trim();
-    if (!q && !hasNarrowingFacets(facets)) {
+    // A typed query replaces a drawn region; adjusting facets keeps it.
+    const region = q ? undefined : url.region;
+    if (!q && !region && !hasNarrowingFacets(facets)) {
       setFormError(
         'Enter a target name, coordinates, an observation ID, or a program ID — or pick filters and apply them'
       );
@@ -179,21 +184,21 @@ const MastSearch: React.FC = () => {
       offerForcedLevelsRef.current = false;
     }
     setFormError(null);
-    url.push(nextUrlState(q, rawRadius, next));
+    url.push(nextUrlState(q, rawRadius, next, region));
   };
 
   /** Removing an applied chip applies at once — it is one deliberate click. */
   const handleRemoveChip = (key: string) => {
     const next = removeFacetChip(appliedFacets, key);
     setDraft(next);
-    url.push(nextUrlState(url.q, url.r, next));
+    url.push(nextUrlState(url.q, url.r, next, url.region));
   };
 
   const handleClear = () => {
     setDraft(EMPTY_FACETS);
     setFormError(null);
     if (!facetsEqual(appliedFacets, EMPTY_FACETS)) {
-      url.push(nextUrlState(url.q, url.r, EMPTY_FACETS));
+      url.push(nextUrlState(url.q, url.r, EMPTY_FACETS, url.region));
     }
   };
 
@@ -206,7 +211,15 @@ const MastSearch: React.FC = () => {
   // up — which aborts the in-flight search — and run again: without the
   // forget, the second run would skip and a deep link would show nothing.
   const lastRunNavKeyRef = useRef<string | null>(null);
-  const { q: urlQ, r: urlR, facets: urlFacets, navKey, searchKey, hasSearch } = url;
+  const {
+    q: urlQ,
+    r: urlR,
+    facets: urlFacets,
+    region: urlRegion,
+    navKey,
+    searchKey,
+    hasSearch,
+  } = url;
   useEffect(() => {
     if (lastRunNavKeyRef.current === navKey) return;
     lastRunNavKeyRef.current = navKey;
@@ -229,18 +242,23 @@ const MastSearch: React.FC = () => {
       reset();
       return forget;
     }
-    lastRunTypeRef.current = parsed ? SEARCH_TYPE_FOR_KIND[parsed.kind] : 'facets';
+    lastRunTypeRef.current = parsed
+      ? SEARCH_TYPE_FOR_KIND[parsed.kind]
+      : urlRegion
+        ? 'coordinates'
+        : 'facets';
     void run(parsed, {
       radius: parseFloat(urlR),
       includeRaw: false,
       calibLevels: facets.calibLevels,
       filters: buildCriteria(facets),
       // a date facet bounds a facet-only query already; the window is for bare facets
-      daysBack: parsed || hasDateFacet(facets) ? undefined : facets.daysBack,
+      daysBack: parsed || urlRegion || hasDateFacet(facets) ? undefined : facets.daysBack,
+      region: parsed ? undefined : urlRegion,
       historyKey: searchKey,
     });
     return forget;
-  }, [navKey, urlQ, urlR, urlFacets, hasSearch, searchKey, run, reset]);
+  }, [navKey, urlQ, urlR, urlFacets, urlRegion, hasSearch, searchKey, run, reset]);
 
   const rawOffer = rawFallbackOffer(
     outcome
@@ -280,6 +298,28 @@ const MastSearch: React.FC = () => {
     },
     [outcome]
   );
+
+  // ---- Draw-to-search (Phase 6) ------------------------------------------
+  /** A drawn shape becomes the search: `region=` replaces `q` in the URL. */
+  const handleRegionDrawn = useCallback(
+    (region: SkyRegion) => {
+      if (regionTooLarge(region)) {
+        toast.warning('Draw a smaller region', {
+          description: 'Regions are limited to about 20 degrees across.',
+          duration: 5000,
+        });
+        return;
+      }
+      setFormError(null);
+      urlPush(nextUrlState('', url.r, draft, region));
+    },
+    [urlPush, nextUrlState, url.r, draft]
+  );
+
+  /** Removing the region chip clears it and runs nothing new. */
+  const handleRegionClear = useCallback(() => {
+    urlPush(nextUrlState(url.q, url.r, appliedFacets));
+  }, [urlPush, nextUrlState, url.q, url.r, appliedFacets]);
 
   // ---- Browse-first empty state (no query, no narrowing facets) ----------
   const browsing = !hasSearch;
@@ -389,7 +429,7 @@ const MastSearch: React.FC = () => {
           setDraft(withRaw);
           // Replace (not push) so Back skips the L3-only variant of the same
           // search; the URL effect re-runs with every level.
-          url.replace(nextUrlState(urlQ, urlR, withRaw));
+          url.replace(nextUrlState(urlQ, urlR, withRaw, urlRegion));
         }}
       />
 
@@ -449,6 +489,7 @@ const MastSearch: React.FC = () => {
                       onSkyClick={searchAtSky}
                       onViewChange={handleBrowseViewChange}
                       notice={coverageNotice}
+                      onRegionDrawn={handleRegionDrawn}
                     />
                   </Suspense>
                 }
@@ -456,12 +497,15 @@ const MastSearch: React.FC = () => {
             </section>
           )}
 
-          {outcome && outcome.count > 0 && (
+          {outcome && (outcome.count > 0 || outcome.region) && (
             <>
               <ResultsToolbar
                 count={outcome.count}
                 truncated={outcome.truncated}
                 pageSize={outcome.pageSize}
+                region={outcome.region}
+                unclippable={outcome.unclippable}
+                onRegionClear={handleRegionClear}
                 visibleColumns={visibleColumns}
                 onVisibleColumnsChange={(next) => {
                   setVisibleColumns(next);
@@ -511,6 +555,9 @@ const MastSearch: React.FC = () => {
                       selectedIds={focusedId ? new Set([...selectedObs, focusedId]) : selectedObs}
                       onHover={setHoverId}
                       onClick={handleMapClick}
+                      region={url.region ?? null}
+                      onRegionDrawn={handleRegionDrawn}
+                      onRegionClear={handleRegionClear}
                     />
                   </Suspense>
                 }

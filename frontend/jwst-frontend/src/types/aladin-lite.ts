@@ -133,7 +133,33 @@ export type EventName =
   | 'resizeChanged'
   | 'layerChanged';
 
+/** `aladin.select('circle', cb)` payload — pixel coordinates. */
+export interface CircleSelection {
+  x: number;
+  y: number;
+  /** Radius in pixels. */
+  r: number;
+}
+
+/** `aladin.select('poly', cb)` payload — pixel coordinates. */
+export interface PolygonSelection {
+  vertices: { x: number; y: number }[];
+}
+
 export interface AladinInstance {
+  /**
+   * Enter an interactive selection mode; the callback receives the drawn
+   * shape in PIXEL coordinates (convert with `pix2world` / `angularDist`).
+   * Verified against the pinned v3 bundle (draw-to-search, Phase 6).
+   */
+  select(mode: 'circle', cb: (sel: CircleSelection) => void): void;
+  select(mode: 'poly', cb: (sel: PolygonSelection) => void): void;
+  /** `fire('default')` returns the view to pan mode (cancels a pending selection). */
+  fire(event: 'default'): void;
+  /** Pixel → sky; undefined/throws outside the projection. */
+  pix2world(x: number, y: number, frame?: 'icrs' | 'j2000' | 'galactic'): [number, number];
+  /** Angular distance between two pixel positions, degrees. */
+  angularDist(x1: number, y1: number, x2: number, y2: number): number;
   on(
     event: 'objectClicked',
     cb: (obj: Footprint | null, xy?: { x: number; y: number }) => void
