@@ -50,6 +50,48 @@ describe('parseStcs', () => {
     expect(polys[1]).toHaveLength(4);
   });
 
+  // Verbatim `s_region` of jw08277-o041_t026_nircam_clear-f277w, a real NIRCam
+  // mosaic returned by a Stephan's Quintet region search: two POLYGONs, 68
+  // numbers, 927 chars. The old fast-path regex used `\s*` between numbers, so
+  // this string matched `POLYGON`, consumed numbers, hit the second literal
+  // `POLYGON`, failed the `$` anchor, and then backtracked over every way of
+  // partitioning ~400 characters of digits — hanging the tab permanently.
+  const MOSAIC_MULTIPOLYGON =
+    'POLYGON 339.156558461 34.425372185 339.153570232 34.389316269 339.153525007 34.389318454 ' +
+    '339.153387099 34.387660709 339.153386864 34.387657872 339.110556414 34.389720135 ' +
+    '339.110559122 34.38977075 339.108545158 34.38986735 339.108545383 34.389871561 339.108543788 ' +
+    '34.389871638 339.110461044 34.425711682 339.110554029 34.425707789 339.110643005 ' +
+    '34.427370267 339.154544358 34.425524426 339.154544196 34.425521003 339.15453893 34.425457475 ' +
+    'POLYGON 339.2154864 34.42177575 339.215407165 34.420624395 339.212438278 34.385936844 ' +
+    '339.212396363 34.385938784 339.212254003 34.384281478 339.212253746 34.384278476 ' +
+    '339.196754017 34.384994769 339.169357454 34.386271018 339.169359728 34.386311809 ' +
+    '339.167345555 34.386404293 339.167345792 34.386408542 339.167344191 34.386408615 ' +
+    '339.169360446 34.422568549 339.169450785 34.422563839 339.169543568 34.424227035 ' +
+    '339.213491753 34.421927906 339.213491594 34.421924543 339.213487839 34.421880679';
+
+  it('parses a real two-POLYGON mosaic footprint', () => {
+    const polys = parseStcs(MOSAIC_MULTIPOLYGON);
+    expect(polys).toHaveLength(2);
+    expect(polys[0].length).toBeGreaterThanOrEqual(3);
+    expect(polys[1].length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('does not backtrack catastrophically on multi-polygon input', () => {
+    const start = Date.now();
+    parseStcs(MOSAIC_MULTIPOLYGON);
+    expect(Date.now() - start).toBeLessThan(250);
+  });
+
+  it('stays linear when a long numeric run fails the fast path', () => {
+    // Doubling the numbers must not square the time. Unbounded backtracking
+    // made this hang outright, so any sane bound proves the fix.
+    const build = (n: number) =>
+      `POLYGON ${Array.from({ length: n }, (_, i) => `339.29404620${i % 10}`).join(' ')} POLYGON 1 2 3 4 5 6`;
+    const start = Date.now();
+    parseStcs(build(200));
+    expect(Date.now() - start).toBeLessThan(250);
+  });
+
   it('turns a CIRCLE into a 32-gon around the centre', () => {
     const polys = parseStcs('CIRCLE ICRS 180 45 0.5');
     expect(polys).toHaveLength(1);
