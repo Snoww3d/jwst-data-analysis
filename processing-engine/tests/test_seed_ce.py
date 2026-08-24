@@ -579,6 +579,64 @@ class TestMainExitCodes:
             "bad": False,
         }
 
+    def test_allow_failures_cannot_ship_an_unrenderable_recipe(self, monkeypatch, tmp_path):
+        """All data present + estimate fail = curation error, not a data gap (#1883).
+
+        --allow-failures exists for recipes missing FITS we never fetched. A
+        recipe that has everything and still fails the estimate would ship in
+        the featured list and dead-end a stranger, so the flag must not pass it.
+        """
+        oid = ObjectId()
+        reports = [
+            RecipeReport("T", "good", [], "ok", [str(oid)], 5),
+            RecipeReport("Tarantula Nebula", "8 filters", [], "fail", ["b" * 24], 12_400_000_000),
+        ]
+        docs = [{"_id": oid, "FilePath": "mast/x.fits", "FileSize": 5}]
+        out = tmp_path / "bundle"
+        rc = self._run_main(
+            monkeypatch,
+            tmp_path,
+            reports,
+            docs,
+            ["export", "--allow-failures", "--out", str(out)],
+        )
+        assert rc == 1
+        assert not out.exists()
+
+    def test_excluded_unrenderable_recipe_is_allowed(self, monkeypatch, tmp_path):
+        """--exclude IS the sanctioned answer for a too-big recipe."""
+        oid = ObjectId()
+        reports = [
+            RecipeReport("T", "good", [], "ok", [str(oid)], 5),
+            RecipeReport("Carina Nebula", "NIRCam", [], "fail", [], 0, excluded=True),
+        ]
+        docs = [{"_id": oid, "FilePath": "mast/x.fits", "FileSize": 5}]
+        rc = self._run_main(
+            monkeypatch,
+            tmp_path,
+            reports,
+            docs,
+            ["export", "--allow-failures", "--out", str(tmp_path / "b")],
+        )
+        assert rc == 0
+
+    def test_missing_data_failure_still_passes_with_allow_failures(self, monkeypatch, tmp_path):
+        """The guard must not swallow the case --allow-failures is actually for."""
+        oid = ObjectId()
+        reports = [
+            RecipeReport("T", "good", [], "ok", [str(oid)], 5),
+            RecipeReport("SMACS", "prefetch-capped", ["F444W"], "fail", [], 0),
+        ]
+        docs = [{"_id": oid, "FilePath": "mast/x.fits", "FileSize": 5}]
+        rc = self._run_main(
+            monkeypatch,
+            tmp_path,
+            reports,
+            docs,
+            ["export", "--allow-failures", "--out", str(tmp_path / "b")],
+        )
+        assert rc == 0
+
     def test_allow_failures_still_refuses_empty_bundle(self, monkeypatch, tmp_path):
         reports = [RecipeReport("T", "bad", ["F444W"], None)]
         rc = self._run_main(

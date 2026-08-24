@@ -5,11 +5,14 @@ Given a set of MAST observations (filter, instrument, wavelength), generates
 ranked composite recipes with chromatic-ordered color assignments.
 """
 
+import json
 import logging
 import math
 import re
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from functools import lru_cache
+from pathlib import Path
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
 from app.instruments import (
@@ -395,6 +398,53 @@ _CURATED_ALIASES: dict[str, str] = {
     "ngc 7320": "stephan's quintet",
     "ngc 6611": "m16",
 }
+
+_FEATURED_TARGETS_PATH = Path(__file__).parent / "featured_targets.json"
+
+
+def _normalize_key(name: str) -> str:
+    """Lower-case and space letter/digit catalog boundaries ("NGC3132" -> "ngc 3132")."""
+    return re.sub(r"([a-z])(\d)", r"\1 \2", name.strip().lower())
+
+
+@lru_cache(maxsize=1)
+def _featured_aliases() -> dict[str, str]:
+    """Featured display name <-> catalog id, both directions, normalized.
+
+    Mirrors ``api_routes.resolve_target_alias``, which the engine cannot import
+    (api_routes -> routes -> recipe_engine would be circular). Bidirectional
+    because CURATED_RECIPES is keyed inconsistently: some entries use the
+    catalog id ("ngc 3324") and some the display name ("stephan's quintet"),
+    so a lookup may need to travel either way to land on a key. A missing or
+    malformed file must not break recipe generation, so failures degrade to
+    no aliases.
+    """
+    try:
+        targets = json.loads(_FEATURED_TARGETS_PATH.read_text())
+    except (OSError, ValueError):  # missing/bad file - curated recipes are an enhancement
+        logger.warning("Could not load %s for curated aliases", _FEATURED_TARGETS_PATH)
+        return {}
+    aliases: dict[str, str] = {}
+    for target in targets:
+        name = _normalize_key(target.get("name") or "")
+        catalog_id = _normalize_key(target.get("catalogId") or "")
+        if not name or not catalog_id or name == catalog_id:
+            continue
+        # setdefault: first target wins, so a later duplicate cannot silently
+        # steal an alias that already points somewhere.
+        aliases.setdefault(name, catalog_id)
+        aliases.setdefault(catalog_id, name)
+    return aliases
+
+
+@lru_cache(maxsize=1)
+def _curated_lookup() -> dict[str, str]:
+    """Normalized curated key -> the literal CURATED_RECIPES key.
+
+    CURATED_RECIPES is written with human keys ("m16"), but lookups arrive
+    normalized ("m 16"), so the raw dict cannot be indexed by them directly.
+    """
+    return {_normalize_key(key): key for key in CURATED_RECIPES}
 
 
 def resolve_wavelength(obs: ObservationInput) -> float | None:
@@ -1021,11 +1071,19 @@ def _normalize_target_name(name: str) -> str:
     Handles common variations: case, whitespace, missing spaces in catalog IDs
     (e.g. "NGC3132" → "ngc 3132"), and resolves aliases.
     """
-    key = name.strip().lower()
-    # Insert space between letter prefix and number if missing (e.g. "ngc3132" → "ngc 3132")
-    key = re.sub(r"([a-z])(\d)", r"\1 \2", key)
-    # Resolve aliases
-    key = _CURATED_ALIASES.get(key, key)
+    key = _normalize_key(name)
+    # A direct hit always wins: "Stephan's Quintet" IS a curated key, even
+    # though featured_targets.json would alias it away to its catalog id
+    # "HCG 92". Only fall through to the alias maps when the name itself
+    # names no recipe.
+    lookup = _curated_lookup()
+    for candidate in (
+        key,
+        _normalize_key(_CURATED_ALIASES.get(key, key)),
+        _featured_aliases().get(key, key),
+    ):
+        if candidate in lookup:
+            return candidate
     return key
 
 
@@ -1045,7 +1103,7 @@ def _inject_curated_recipes(
     relevant observations with an overlap_warning.
     """
     key = _normalize_target_name(target_name)
-    curated_defs = CURATED_RECIPES.get(key)
+    curated_defs = CURATED_RECIPES.get(_curated_lookup().get(key, key))
     if not curated_defs:
         return []
 

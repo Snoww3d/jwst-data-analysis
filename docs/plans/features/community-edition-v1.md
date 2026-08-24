@@ -302,12 +302,20 @@ Curation decision: `COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=0.15` in CE (NIRCam
 renders at 3.5–5k px instead of refusal; 3GB budget stays the hard bound);
 Carina + Stephan's Quintet NIRCam recipe families excluded (~66GB of 160+
 file mosaics with >300s estimates) — their MIRI recipes ship, so all 12
-featured tiles work. Remaining 12 failing recipes (SMACS/Tarantula/Cas A
-filters skipped by the 6GB per-file prefetch cap + 2 genuinely too-big) show
-the Phase 3 CE explainer. Rebuild anytime:
+featured tiles work. Remaining failing recipes (SMACS/Tarantula/Cas A filters
+skipped by the 6GB per-file prefetch cap) show the Phase 3 CE explainer.
+
+The 2 genuinely-too-big recipes are now excluded rather than shipped failing
+(#1883): `Tarantula Nebula / 8 filters · NIRCam` (12.4GB) and `NGC 346 /
+21 filters · NIRCam+MIRI` (11.1GB) had all their data present, so
+`--allow-failures` let them into the featured list where they dead-ended on
+render. `seed_ce.py` now refuses that combination outright — data-complete +
+`estimate_status=fail` is a curation error and `--exclude` is its answer.
+Rebuild anytime:
 `SEED_HARDLINK=1 ./scripts/seed-ce.sh build --out <dir> --fail-threshold 0.15
 --allow-failures --exclude "Carina Nebula/*NIRCam*" --exclude "Stephan's
-Quintet/*NIRCam*"`.
+Quintet/*NIRCam*" --exclude "Tarantula Nebula/*8 filters*" --exclude "NGC
+346/*21 filters*"`.
 
 - [x] `seed-ce.sh`: run `scripts/prefetch-discovery.sh` against
       `featured-targets.json` (FITS into `/app/data`) + export matching Mongo
