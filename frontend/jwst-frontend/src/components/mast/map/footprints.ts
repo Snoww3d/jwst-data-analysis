@@ -45,9 +45,25 @@ const FRAME_TOKENS = new Set(['ICRS', 'J2000', 'FK5', 'FK4', 'GALACTIC', 'ECLIPT
 const CIRCLE_SEGMENTS = 32;
 const DEG = Math.PI / 180;
 
-/** Fast path: bare `POLYGON` followed by an even run of ≥6 numbers and nothing else. */
-const BARE_POLYGON_RE = /^\s*POLYGON\s+((?:[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*){6,})$/i;
-const NUMBER_RE = /^[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?$/i;
+const NUMBER_SRC = String.raw`[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?`;
+
+/**
+ * Fast path: bare `POLYGON` followed by a run of ≥6 numbers and nothing else.
+ *
+ * The separator between numbers MUST be `\s+`, not `\s*`. With `\s*` a run of
+ * digits could be partitioned across repetitions in exponentially many ways
+ * ("339" as "3"+"3"+"9", …), so a string that matches `POLYGON` and then fails
+ * the `$` anchor — every multi-polygon `s_region`, e.g. mosaic footprints of
+ * the form `POLYGON … POLYGON …` — sent the engine into catastrophic
+ * backtracking and hung the tab for good. Requiring real whitespace makes the
+ * partition unique and the failure linear, so multi-polygon input falls
+ * through to the tolerant tokeniser below (which parses it correctly).
+ */
+const BARE_POLYGON_RE = new RegExp(
+  `^\\s*POLYGON\\s+(${NUMBER_SRC}(?:\\s+${NUMBER_SRC}){5,})\\s*$`,
+  'i'
+);
+const NUMBER_RE = new RegExp(`^${NUMBER_SRC}$`, 'i');
 
 function normaliseRa(ra: number): number {
   let r = ra % 360;

@@ -78,6 +78,13 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   z-index: var(--z-elevated);
+  /* The bar hugs its content, so at its natural ~384px it outgrew a narrow
+     split pane and `.sky-map`'s `overflow: hidden` silently cut the controls
+     off — below ~1400px that ate Clear, and at the 1024px split breakpoint it
+     ate Polygon too, leaving no way to draw. Bound it to the pane and wrap. */
+  max-width: calc(100% - var(--space-2) * 2);
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
 }
 
 .sky-map-survey select {
