@@ -885,6 +885,78 @@ class TestCuratedRecipes:
         assert len(curated) == 1
         assert "Pillars" in curated[0].name
 
+    def test_featured_display_name_resolves(self):
+        """The display name "Carina Nebula" should reach the NGC 3324 Cosmic Cliffs recipe (#1882).
+
+        _CURATED_ALIASES only maps catalog id -> catalog id, so display names
+        used by featured targets and the MAST search UI missed entirely.
+        """
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="Carina Nebula")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert "Cosmic Cliffs" in curated[0].name
+
+    def test_m16_reachable_by_its_own_catalog_id(self):
+        """The catalog id "M16" should reach the m16 recipe.
+
+        Normalization spaces letter/digit boundaries ("m16" -> "m 16"), so the
+        literal "m16" curated key was previously reachable only via its
+        "ngc 6611" alias — never by the catalog id it is named for.
+        """
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        for name in ("M16", "m16", "M 16"):
+            curated = [r for r in generate_recipes(obs, target_name=name) if r.tag == "NASA-style"]
+            assert len(curated) == 1, name
+            assert "Pillars" in curated[0].name, name
+
+    def test_every_curated_key_is_reachable(self):
+        """Each CURATED_RECIPES key must resolve back to itself through normalization.
+
+        Guards the class of bug behind #1882: a key spelled in a form that
+        _normalize_target_name rewrites is dead on arrival.
+        """
+        from app.discovery.recipe_engine import _curated_lookup, _normalize_target_name
+
+        for key in CURATED_RECIPES:
+            resolved = _normalize_target_name(key)
+            assert _curated_lookup().get(resolved) == key, (
+                f"Curated key {key!r} normalizes to {resolved!r} and is unreachable"
+            )
+
+    def test_featured_target_names_resolve_or_are_absent(self):
+        """No featured display name may resolve to a *wrong* curated recipe."""
+        import json
+
+        from app.discovery.recipe_engine import (
+            _FEATURED_TARGETS_PATH,
+            _curated_lookup,
+            _normalize_target_name,
+        )
+
+        for target in json.loads(_FEATURED_TARGETS_PATH.read_text()):
+            name, catalog_id = target.get("name"), target.get("catalogId")
+            if not name or not catalog_id:
+                continue
+            by_name = _curated_lookup().get(_normalize_target_name(name))
+            by_id = _curated_lookup().get(_normalize_target_name(catalog_id))
+            assert by_name == by_id, (
+                f"{name!r} resolves to {by_name!r} but its catalog id "
+                f"{catalog_id!r} resolves to {by_id!r}"
+            )
+
     def test_obs_ids_filtered_to_recipe_filters(self):
         """Curated recipe should only include obs IDs for its own filters."""
         obs = [

@@ -774,6 +774,28 @@ def main(argv: list[str] | None = None) -> int:
     excluded = [r for r in reports if r.excluded]
     if excluded:
         logger.info("%d recipe(s) excluded by --exclude patterns", len(excluded))
+    # --allow-failures covers recipes we never fetched all the DATA for: the CE
+    # UI shows the Phase 3 explainer and the stranger understands why. It must
+    # NOT wave through a recipe whose data is all present but whose render
+    # estimate FAILS — that one looks fetchable, ships in the featured list,
+    # and then blows the render budget when a stranger clicks it (#1883). The
+    # curation answer is --exclude (as Carina/Stephan's NIRCam already are), so
+    # name the recipes and refuse regardless of the flag.
+    unrenderable = [
+        r
+        for r in reports
+        if not r.excluded and not r.missing_filters and r.estimate_status == "fail"
+    ]
+    if unrenderable:
+        logger.error(
+            "curation gate FAILED: %d recipe(s) have all their data but fail the render "
+            "estimate — they would ship in the CE UI and dead-end. Either --exclude them "
+            "or shrink them: %s",
+            len(unrenderable),
+            ", ".join(f"{r.target} / {r.recipe}" for r in unrenderable),
+        )
+        return 1
+
     failed = [r for r in reports if not r.passed and not r.excluded]
     if failed and not args.allow_failures:
         logger.error("completeness gate FAILED: %d recipe(s) not fully renderable", len(failed))
