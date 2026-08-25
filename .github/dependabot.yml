@@ -3,6 +3,13 @@ version: 2
 # All ecosystems share the same conventional-commit prefix so PR titles
 # satisfy the `Validate PR Standards` workflow without manual editing.
 # (NuGet does NOT default to a conventional prefix — see #1126.)
+#
+# open-pull-requests-limit is 99 (effectively uncapped) on every ecosystem.
+# Dependabot has no "unlimited" value and 0 DISABLES version updates, so a
+# high number is the way to lift the cap. The default is 5, which silently
+# starves the queue when a PR is parked long-term — e.g. #1795 (typescript 7)
+# is blocked on @typescript-eslint's peer range and holds a slot indefinitely.
+# Note this cap never applied to security updates; those have their own budget.
 
 updates:
   # NPM (Frontend)
@@ -10,7 +17,7 @@ updates:
     directory: "/frontend/jwst-frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 99
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
@@ -41,7 +48,7 @@ updates:
     directory: "/backend/JwstDataAnalysis.API"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 99
     commit-message:
       prefix: "chore(deps)"
     labels:
@@ -53,7 +60,7 @@ updates:
     directory: "/processing-engine"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 99
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
@@ -66,6 +73,7 @@ updates:
     directory: "/docker"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 99
     commit-message:
       prefix: "chore(deps)"
     labels:
@@ -77,6 +85,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 99
     commit-message:
       prefix: "chore(deps)"
     labels:
