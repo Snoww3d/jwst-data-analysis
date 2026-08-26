@@ -61,8 +61,24 @@ export const SKY_SURVEYS = [
 ] as const;
 export type SkySurveyId = (typeof SKY_SURVEYS)[number]['id'];
 
+/**
+ * All-sky projections offered in the chrome. Aladin ships many more, but the
+ * rest are tangent-plane projections that say nothing at an all-sky FOV.
+ * Aitoff and Mollweide are the two every other archive UI offers; SIN is the
+ * globe, kept because it reads well once zoomed into a single field.
+ */
+export const SKY_PROJECTIONS = [
+  { id: 'AIT', label: 'Aitoff' },
+  { id: 'MOL', label: 'Mollweide' },
+  { id: 'SIN', label: 'Sphere' },
+] as const;
+export type SkyProjectionId = (typeof SKY_PROJECTIONS)[number]['id'];
+
 export const DEFAULT_SKY_FOV = 180;
+/** The browse view opens at FOV 180; a globe can only show half of that. */
+export const DEFAULT_SKY_PROJECTION: SkyProjectionId = 'AIT';
 export const SKY_SURVEY_STORAGE_KEY = 'mast_sky_survey';
+export const SKY_PROJECTION_STORAGE_KEY = 'mast_sky_projection';
 const VIEW_DEBOUNCE_MS = 250;
 
 export interface SkyMapProps {
@@ -110,6 +126,25 @@ function loadSurvey(): SkySurveyId {
 function saveSurvey(id: SkySurveyId): void {
   try {
     localStorage.setItem(SKY_SURVEY_STORAGE_KEY, id);
+  } catch {
+    /* cosmetic */
+  }
+}
+
+function loadProjection(): SkyProjectionId {
+  try {
+    const stored = localStorage.getItem(SKY_PROJECTION_STORAGE_KEY);
+    return SKY_PROJECTIONS.some((p) => p.id === stored)
+      ? (stored as SkyProjectionId)
+      : DEFAULT_SKY_PROJECTION;
+  } catch {
+    return DEFAULT_SKY_PROJECTION;
+  }
+}
+
+function saveProjection(id: SkyProjectionId): void {
+  try {
+    localStorage.setItem(SKY_PROJECTION_STORAGE_KEY, id);
   } catch {
     /* cosmetic */
   }
@@ -189,6 +224,7 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tileError, setTileError] = useState(false);
   const [survey, setSurvey] = useState<SkySurveyId>(() => loadSurvey());
+  const [projection, setProjection] = useState<SkyProjectionId>(() => loadProjection());
   const [drawMode, setDrawMode] = useState<DrawMode | null>(null);
   const drawModeRef = useRef<DrawMode | null>(null);
   drawModeRef.current = drawMode;
@@ -440,6 +476,7 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
         ARef.current = A;
         const aladin = A.aladin(containerRef.current, {
           survey: loadSurvey(),
+          projection: loadProjection(),
           fov: initialView?.fov ?? DEFAULT_SKY_FOV,
           target: initialView ? `${initialView.ra ?? 0} ${initialView.dec ?? 0}` : '0 0',
           cooFrame: 'ICRS',
@@ -573,6 +610,17 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
     }
   }, [survey, status]);
 
+  // Projection switch (also re-applies after mount so the stored choice wins).
+  useEffect(() => {
+    const aladin = aladinRef.current;
+    if (!aladin || status !== 'ready') return;
+    try {
+      aladin.setProjection(projection);
+    } catch {
+      /* an unsupported projection is not worth breaking the map over */
+    }
+  }, [projection, status]);
+
   useEffect(() => {
     const onOffline = () => setTileError(true);
     window.addEventListener('offline', onOffline);
@@ -628,6 +676,24 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
                 {SKY_SURVEYS.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="sky-map-projection">
+              <span className="visually-hidden">Projection</span>
+              <select
+                value={projection}
+                onChange={(e) => {
+                  const next = e.target.value as SkyProjectionId;
+                  setProjection(next);
+                  saveProjection(next);
+                }}
+                aria-label="Projection"
+              >
+                {SKY_PROJECTIONS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
                   </option>
                 ))}
               </select>

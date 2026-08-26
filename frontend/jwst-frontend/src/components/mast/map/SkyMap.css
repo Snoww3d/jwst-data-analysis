@@ -87,7 +87,8 @@
   row-gap: var(--space-1);
 }
 
-.sky-map-survey select {
+.sky-map-survey select,
+.sky-map-projection select {
   background: var(--bg-surface);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
@@ -97,7 +98,8 @@
   font-family: var(--font-sans);
 }
 
-.sky-map-survey select:focus-visible {
+.sky-map-survey select:focus-visible,
+.sky-map-projection select:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 1px;
 }
