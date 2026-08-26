@@ -1,5 +1,5 @@
 import type { AladinOptions } from '../../../types/aladin-lite';
-import { createRef } from 'react';
+import type { RefObject } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SkyMap, { coverageTiers, type SkyMapHandle } from './SkyMap';
@@ -111,13 +111,15 @@ describe('SkyMap', () => {
   it('creates Aladin with the chrome hidden, draws footprints coloured by instrument, fits', async () => {
     const stub = makeStubA();
     loadAladinMock.mockResolvedValue(stub.A);
-    const ref = createRef<SkyMapHandle>();
+    // A plain ref object, not createRef: hooks are unavailable outside a component.
+    const ref: RefObject<SkyMapHandle | null> = { current: null };
     render(<SkyMap ref={ref} rows={ROWS} />);
     await waitFor(() => expect(screen.getByLabelText('Background survey')).toBeInTheDocument());
 
     const opts = stub.A.aladin.mock.calls[0][1] as unknown as AladinOptions;
     expect(opts).toMatchObject({
       survey: 'P/DSS2/color',
+      projection: 'AIT',
       showReticle: false,
       showLayersControl: false,
       showFullscreenControl: false,
@@ -147,7 +149,8 @@ describe('SkyMap', () => {
     const onHover = vi.fn();
     const onClick = vi.fn();
     const onSkyClick = vi.fn();
-    const ref = createRef<SkyMapHandle>();
+    // A plain ref object, not createRef: hooks are unavailable outside a component.
+    const ref: RefObject<SkyMapHandle | null> = { current: null };
     const { rerender } = render(
       <SkyMap ref={ref} rows={ROWS} onHover={onHover} onClick={onClick} onSkyClick={onSkyClick} />
     );
@@ -181,7 +184,8 @@ describe('SkyMap', () => {
   it('exposes goto / fitToResults / getView / setFootprints on the handle', async () => {
     const stub = makeStubA();
     loadAladinMock.mockResolvedValue(stub.A);
-    const ref = createRef<SkyMapHandle>();
+    // A plain ref object, not createRef: hooks are unavailable outside a component.
+    const ref: RefObject<SkyMapHandle | null> = { current: null };
     render(<SkyMap ref={ref} autoFit={false} />);
     await waitFor(() => expect(screen.getByLabelText('Background survey')).toBeInTheDocument());
     expect(stub.aladin.gotoRaDec).not.toHaveBeenCalled();
@@ -215,6 +219,40 @@ describe('SkyMap', () => {
     expect(call[0]).toBe('P/2MASS/color');
     act(() => (call[1] as { errorCallback: () => void }).errorCallback());
     expect(await screen.findByText(/Sky imagery unavailable/)).toBeInTheDocument();
+  });
+
+  it('switches projection and persists it', async () => {
+    const stub = makeStubA();
+    loadAladinMock.mockResolvedValue(stub.A);
+    render(<SkyMap />);
+    const select = await screen.findByLabelText('Projection');
+    act(() => {
+      (select as HTMLSelectElement).value = 'SIN';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitFor(() => expect(stub.aladin.setProjection).toHaveBeenCalledWith('SIN'));
+    expect(localStorage.getItem('mast_sky_projection')).toBe('SIN');
+  });
+
+  it('restores a stored projection at mount', async () => {
+    localStorage.setItem('mast_sky_projection', 'MOL');
+    const stub = makeStubA();
+    loadAladinMock.mockResolvedValue(stub.A);
+    render(<SkyMap />);
+    await waitFor(() => expect(screen.getByLabelText('Projection')).toBeInTheDocument());
+    const opts = stub.A.aladin.mock.calls[0][1] as unknown as AladinOptions;
+    expect(opts.projection).toBe('MOL');
+    expect((screen.getByLabelText('Projection') as HTMLSelectElement).value).toBe('MOL');
+  });
+
+  it('falls back to the default projection when the stored value is junk', async () => {
+    localStorage.setItem('mast_sky_projection', 'NOPE');
+    const stub = makeStubA();
+    loadAladinMock.mockResolvedValue(stub.A);
+    render(<SkyMap />);
+    await waitFor(() => expect(screen.getByLabelText('Projection')).toBeInTheDocument());
+    const opts = stub.A.aladin.mock.calls[0][1] as unknown as AladinOptions;
+    expect(opts.projection).toBe('AIT');
   });
 
   it('draws the coverage grid as density-tiered MOCs', async () => {
