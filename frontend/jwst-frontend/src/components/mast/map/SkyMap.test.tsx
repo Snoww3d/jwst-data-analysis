@@ -2,7 +2,7 @@ import type { AladinOptions } from '../../../types/aladin-lite';
 import type { RefObject } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import SkyMap, { coverageTiers, type SkyMapHandle } from './SkyMap';
+import SkyMap, { allSkyFov, coverageTiers, type SkyMapHandle } from './SkyMap';
 import { AladinLoadError } from '../../../lib/loadAladin';
 
 const loadAladinMock = vi.fn();
@@ -125,7 +125,7 @@ describe('SkyMap', () => {
       showFullscreenControl: false,
       showGotoControl: false,
       cooFrame: 'ICRS',
-      fov: 180,
+      fov: 360, // Aitoff is the default; an all-sky projection needs 360°
     });
     // three overlays: footprints + emphasis + region (Phase 6)
     expect(stub.aladin.addOverlay).toHaveBeenCalledTimes(3);
@@ -232,6 +232,53 @@ describe('SkyMap', () => {
     });
     await waitFor(() => expect(stub.aladin.setProjection).toHaveBeenCalledWith('SIN'));
     expect(localStorage.getItem('mast_sky_projection')).toBe('SIN');
+  });
+
+  it('sizes the all-sky field of view per projection', () => {
+    expect(allSkyFov('AIT')).toBe(360);
+    expect(allSkyFov('MOL')).toBe(360);
+    // A globe shows one hemisphere; 360 would just shrink it in the pane.
+    expect(allSkyFov('SIN')).toBe(180);
+  });
+
+  it('mounts a stored globe projection at 180, not 360', async () => {
+    localStorage.setItem('mast_sky_projection', 'SIN');
+    const stub = makeStubA();
+    loadAladinMock.mockResolvedValue(stub.A);
+    render(<SkyMap />);
+    await waitFor(() => expect(screen.getByLabelText('Projection')).toBeInTheDocument());
+    const opts = stub.A.aladin.mock.calls[0][1] as unknown as AladinOptions;
+    expect(opts).toMatchObject({ projection: 'SIN', fov: 180 });
+  });
+
+  it('widens the browse view to 360 when switching to an all-sky projection', async () => {
+    localStorage.setItem('mast_sky_projection', 'SIN');
+    const stub = makeStubA();
+    stub.aladin.getFov.mockReturnValue([180, 120]); // zoomed out: browse state
+    loadAladinMock.mockResolvedValue(stub.A);
+    render(<SkyMap />);
+    const select = await screen.findByLabelText('Projection');
+    act(() => {
+      (select as HTMLSelectElement).value = 'AIT';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitFor(() => expect(stub.aladin.setProjection).toHaveBeenCalledWith('AIT'));
+    expect(stub.aladin.setFoV).toHaveBeenCalledWith(360);
+  });
+
+  it('leaves a zoomed-in view alone when the projection changes', async () => {
+    const stub = makeStubA();
+    stub.aladin.getFov.mockReturnValue([0.5, 0.4]); // parked on a target
+    loadAladinMock.mockResolvedValue(stub.A);
+    render(<SkyMap />);
+    const select = await screen.findByLabelText('Projection');
+    stub.aladin.setFoV.mockClear();
+    act(() => {
+      (select as HTMLSelectElement).value = 'SIN';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitFor(() => expect(stub.aladin.setProjection).toHaveBeenCalledWith('SIN'));
+    expect(stub.aladin.setFoV).not.toHaveBeenCalled();
   });
 
   it('restores a stored projection at mount', async () => {

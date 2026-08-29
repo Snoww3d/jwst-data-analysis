@@ -75,6 +75,23 @@ export const SKY_PROJECTIONS = [
 export type SkyProjectionId = (typeof SKY_PROJECTIONS)[number]['id'];
 
 export const DEFAULT_SKY_FOV = 180;
+/**
+ * A view at or above this FOV is the whole-sky browse state rather than a
+ * target the user has zoomed into, so it is safe to resize on a projection
+ * change.
+ */
+export const ALL_SKY_FOV_THRESHOLD = 180;
+
+/**
+ * Horizontal extent needed to show the entire sky in a given projection.
+ *
+ * An all-sky projection lays the full 360° of RA across its width, so a 180°
+ * FOV clips the eastern and western thirds; a globe only ever renders the near
+ * hemisphere, and widening it past 180 just shrinks it inside the pane.
+ */
+export function allSkyFov(projection: SkyProjectionId): number {
+  return projection === 'SIN' ? DEFAULT_SKY_FOV : 360;
+}
 /** The browse view opens at FOV 180; a globe can only show half of that. */
 export const DEFAULT_SKY_PROJECTION: SkyProjectionId = 'AIT';
 export const SKY_SURVEY_STORAGE_KEY = 'mast_sky_survey';
@@ -477,7 +494,7 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
         const aladin = A.aladin(containerRef.current, {
           survey: loadSurvey(),
           projection: loadProjection(),
-          fov: initialView?.fov ?? DEFAULT_SKY_FOV,
+          fov: initialView?.fov ?? allSkyFov(loadProjection()),
           target: initialView ? `${initialView.ra ?? 0} ${initialView.dec ?? 0}` : '0 0',
           cooFrame: 'ICRS',
           showReticle: false,
@@ -616,6 +633,11 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
     if (!aladin || status !== 'ready') return;
     try {
       aladin.setProjection(projection);
+      // Keep the browse view whole-sky across a projection change. Only when
+      // already zoomed out — switching projection must never yank the user
+      // back off a target they are looking at.
+      const [fov] = aladin.getFov();
+      if (fov >= ALL_SKY_FOV_THRESHOLD) aladin.setFoV(allSkyFov(projection));
     } catch {
       /* an unsupported projection is not worth breaking the map over */
     }
