@@ -47,6 +47,20 @@ docker compose up -d --build             # Rebuild after changes
 
 For full setup: [`docs/setup-guide.md`](docs/setup-guide.md). For service-specific dev commands: same file.
 
+## Development Lifecycle
+
+This repo is **`public` tier** — the highest-rigor tier of the shared SDLC. Config: [`.claude/sdlc.json`](.claude/sdlc.json). Process, templates and stage instructions live in the global `sdlc` skill; run `/sdlc` rather than reconstructing the process.
+
+Artifacts chain through git, and the same slug carries across all three:
+
+| Stage | Artifact | Lives in |
+|-------|----------|----------|
+| Plan | `intent.md` — the problem, before any solution | [`docs/plans/intent/`](docs/plans/intent/) |
+| Design | `spec.md` — requirements, approach, flagged concerns | [`docs/plans/design/`](docs/plans/design/) |
+| Build | `plan.md` — steps, proofs, rollback, blast radius | [`docs/plans/features/`](docs/plans/features/) |
+
+The `require-plan-file` hook already enforces the Build stage. PR reviews run against [`REVIEW.md`](REVIEW.md).
+
 ## Core Rules
 
 - **Never push directly to `main`** — hooks enforce this at commit and push time.

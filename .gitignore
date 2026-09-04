@@ -51,6 +51,8 @@ data-agent*/
 # Claude Code local settings (skills are committed, everything else is local)
 .claude/*
 !.claude/skills/
+# SDLC config is a versioned artifact — see the global `sdlc` skill
+!.claude/sdlc.json
 CLAUDE.md
 
 # Staging infrastructure config (contains instance IDs, IPs)

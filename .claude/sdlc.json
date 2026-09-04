@@ -1,0 +1,17 @@
+{
+  "$comment": "SDLC config for this repo. Process, tiers and templates live in the global `sdlc` skill (~/.claude/skills/sdlc/).",
+  "tier": "public",
+  "artifacts": {
+    "intent": "docs/plans/intent/",
+    "spec": "docs/plans/design/",
+    "plan": "docs/plans/features/"
+  },
+  "review_policy": "REVIEW.md",
+  "gates": {
+    "require_plan_before_code": true,
+    "require_spec_for_new_features": true,
+    "require_human_deploy_approval": true,
+    "flag_risk_areas_in_summary": true,
+    "evals_in_ci": false
+  }
+}
