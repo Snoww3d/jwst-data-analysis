@@ -47,6 +47,22 @@ docker compose up -d --build             # Rebuild after changes
 
 For full setup: [`docs/setup-guide.md`](docs/setup-guide.md). For service-specific dev commands: same file.
 
+## Development Lifecycle
+
+This repo is **`public` tier** — the highest-rigor tier of the shared SDLC. Config: [`.claude/sdlc.json`](.claude/sdlc.json). Process, templates and stage instructions live in the global `sdlc` skill; run `/sdlc` rather than reconstructing the process.
+
+Artifacts chain through git, and the same slug carries across all three:
+
+| Stage | Artifact | Lives in |
+|-------|----------|----------|
+| Plan | `intent.md` — the problem, before any solution | [`docs/plans/intent/`](docs/plans/intent/) |
+| Design | `spec.md` — requirements, approach, flagged concerns | [`docs/plans/design/`](docs/plans/design/) |
+| Build | `plan.md` — steps, proofs, rollback, blast radius | [`docs/plans/features/`](docs/plans/features/) |
+
+The `require-plan-file` hook already enforces the Build stage. PR reviews run against [`REVIEW.md`](REVIEW.md).
+
+**Danger zones.** Merges stay autonomous. The exception is a PR touching a path listed in `danger_zones.paths` in [`.claude/sdlc.json`](.claude/sdlc.json) — auth, persistence, storage, secrets and deploy config, CI workflows, and the agent's own hooks. Those require a human approving review plus a spec, enforced by the `Danger Zone` check. A PR touching none of those paths is not gated at all.
+
 ## Core Rules
 
 - **Never push directly to `main`** — hooks enforce this at commit and push time.
