@@ -1,0 +1,35 @@
+name: Danger Zone
+
+# Gates ONLY the PRs that can actually hurt. A PR touching none of the paths in
+# `.claude/sdlc.json` -> `danger_zones.paths` passes immediately and merges
+# autonomously, exactly as before. A PR touching one requires a human approving
+# review. See the `sdlc` skill for the reasoning.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  danger-zone:
+    name: Danger Zone Gate
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Evaluate danger zones
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: node .github/scripts/danger-zone.js

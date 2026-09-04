@@ -102,6 +102,19 @@ constraints in [`AGENTS.md`](AGENTS.md).
 - **Never weaken or delete a test.** If a test fails because of the
   architecture, fix the architecture.
 
+## Danger zones
+
+`danger_zones.paths` in `.claude/sdlc.json` lists the paths where a mistake is
+expensive. A PR touching one requires a human approving review and a spec, and
+the `Danger Zone` check enforces both.
+
+When reviewing such a PR, spend the extra attention there rather than spreading
+it evenly. When reviewing a PR that touches none of them, do not invent gravity
+it does not have.
+
+If a review finds a dangerous path that is **not** on the list, adding it to the
+list is part of resolving the finding.
+
 ## Do not re-review what hooks enforce
 
 Pre-commit already runs ESLint, Prettier, `tsc`, vitest, `dotnet build`+`test`,
