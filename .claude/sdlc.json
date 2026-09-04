@@ -29,6 +29,7 @@
       "backend/JwstDataAnalysis.API/Services/MongoDBService.cs",
       "backend/JwstDataAnalysis.API/appsettings*.json",
       "docker/.env*",
+      ".gitignore",
       "docker/docker-compose*.yml",
       ".github/workflows/**",
       ".claude/hooks/**",
