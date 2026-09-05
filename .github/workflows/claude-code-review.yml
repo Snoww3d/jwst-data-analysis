@@ -1,5 +1,23 @@
 name: Claude Code Review
 
+# Two ways in:
+#
+#   pull_request     - automatic, for branches in this repo only. Fork PRs are
+#                      skipped because GitHub never exposes secrets (or an OIDC
+#                      token) to fork-triggered `pull_request` runs, so the
+#                      action can only fail there.
+#   workflow_dispatch - manual, for any PR including forks. A maintainer runs
+#                      it once the PR is otherwise green:
+#
+#                        gh workflow run claude-code-review.yml -f pr=1963
+#
+#                      Only users with write access can dispatch, so external
+#                      contributors cannot trigger it or spend the maintainer's
+#                      Claude usage. The checkout below is always this repo's
+#                      ref (never the fork head), and the review plugin only
+#                      reads the PR through `gh pr diff` / `gh pr view`, so no
+#                      untrusted code is executed.
+
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
@@ -9,13 +27,23 @@ on:
     #   - "src/**/*.tsx"
     #   - "src/**/*.js"
     #   - "src/**/*.jsx"
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to review"
+        required: true
+        type: string
 
 jobs:
   claude-review:
     # Dependabot-triggered runs read secrets from the Dependabot secret store,
     # where CLAUDE_CODE_OAUTH_TOKEN is not set, so the review action always
     # fails on dependency-bump PRs. Skip it there (auto-merge tier anyway).
-    if: github.actor != 'dependabot[bot]'
+    # Fork PRs get no secrets at all on `pull_request`; use the manual path.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.actor != 'dependabot[bot]' &&
+       github.event.pull_request.head.repo.fork == false)
 
     runs-on: ubuntu-latest
     permissions:
@@ -26,6 +54,9 @@ jobs:
 
     steps:
       - name: Checkout repository
+        # No `ref:` on purpose. On pull_request this is the PR merge ref of an
+        # in-repo branch; on workflow_dispatch it is the ref the workflow was
+        # dispatched from. It is never the fork's head.
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
@@ -37,7 +68,6 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || inputs.pr }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
