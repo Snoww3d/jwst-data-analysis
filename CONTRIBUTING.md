@@ -20,13 +20,13 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    ```bash
    git clone https://github.com/YOUR_USERNAME/jwst-data-analysis.git
    cd jwst-data-analysis
-```text
+   ```
 3. Start the development environment:
    ```bash
    cd docker
    cp .env.example .env
    docker compose up -d
-```text
+   ```
 4. Verify services are running at http://localhost:3000
 
 ## How to Contribute
@@ -53,7 +53,7 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
 1. **Create a branch** from `main`:
    ```bash
    git checkout -b feature/your-feature-name
-```text
+   ```
 
 2. **Make your changes** following our coding standards
 
@@ -61,31 +61,40 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    ```bash
    cd docker
    docker compose up -d --build
-```text
+   ```
 
 4. **Commit with conventional messages**:
    ```bash
    git commit -m "feat: Add new feature"
-```yaml
+   ```
 
    Prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
 
 5. **Push and create PR**:
    ```bash
    git push origin feature/your-feature-name
-```tsx
+   ```
 
 6. **PR checklist**:
-   - [ ] Clear description of changes
    - [ ] PR title uses conventional commit format (`feat:`, `fix:`, `docs:`, etc.)
-   - [ ] PR template sections are fully completed
+   - [ ] Branch name uses a matching prefix (`feature/`, `fix/`, `docs/`, etc.)
+   - [ ] Every section of [the PR template](.github/PULL_REQUEST_TEMPLATE.md) is present and filled in
    - [ ] Tech debt impact is classified and `docs/tech-debt.md` is updated when debt changes
    - [ ] CI checks passing
    - [ ] Documentation updated (if needed)
 
-7. **PR standards are enforced in CI**:
-   - Pull requests are validated for title format, branch naming, template completeness, checklist status, and tech debt handling.
-   - Draft PRs are exempt until marked ready for review.
+7. **PR standards are enforced in CI** by the `Validate PR Standards` check
+   (`.github/scripts/validate-pr.js`). It fails the PR when any of these are missing:
+   - Title prefix: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`
+   - Branch prefix: `feature/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, `perf/`, `ci/`
+   - `Closes #N` (or `No linked issue`) in the body
+   - `## Summary` with a real description
+   - `## Changes Made` with at least one bullet
+   - `## Test Plan`, `## Documentation Checklist`, `## Tech Debt Impact` with at least one box checked
+   - `## Risk & Rollback` with non-empty `Risk:` and `Rollback:` values
+
+   Do not delete or rename template sections — the check looks for them by heading.
+   Draft PRs are exempt until marked ready for review.
 
 ## Coding Standards
 
@@ -108,7 +117,7 @@ See [docs/standards/](./docs/standards/) for detailed guidelines.
 
 ## Project Structure
 
-```tsx
+```text
 backend/                    # .NET API
 frontend/jwst-frontend/     # React app
 processing-engine/          # Python service
