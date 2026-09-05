@@ -105,8 +105,12 @@ constraints in [`AGENTS.md`](AGENTS.md).
 ## Danger zones
 
 `danger_zones.paths` in `.claude/sdlc.json` lists the paths where a mistake is
-expensive. A PR touching one requires a human approving review and a spec, and
-the `Danger Zone` check enforces both.
+expensive. A PR touching one requires a human signal and a spec, and the
+`Danger Zone` check enforces both. The human signal is an approving review from
+a non-bot, or the `danger-approved` label applied by the repo owner. The spec
+signal is a spec in the diff, a `Spec: docs/plans/design/<name>.md` body line
+naming one already on `main`, or for diffs under 200 lines a
+`SDLC-Exception: plan-in-pr-body` body line.
 
 When reviewing such a PR, spend the extra attention there rather than spreading
 it evenly. When reviewing a PR that touches none of them, do not invent gravity
