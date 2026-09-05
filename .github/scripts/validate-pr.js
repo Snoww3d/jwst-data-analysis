@@ -242,6 +242,20 @@ if (errors.length > 0) {
   for (const error of errors) {
     console.error(`- ${error}`);
   }
+  console.error("");
+  console.error(
+    "Fix: keep every heading from .github/PULL_REQUEST_TEMPLATE.md and fill it in.",
+  );
+  console.error(
+    'Rules: CONTRIBUTING.md → "Pull Requests". Check locally: ./scripts/validate-pr.sh',
+  );
+  // GitHub Actions annotation so the summary appears on the PR Checks tab,
+  // not only inside the job log. Harmless outside Actions.
+  if (process.env.GITHUB_ACTIONS === "true") {
+    console.log(
+      `::error title=PR standards::${errors.length} issue(s) — see CONTRIBUTING.md → Pull Requests, or run ./scripts/validate-pr.sh`,
+    );
+  }
   process.exit(1);
 }
 

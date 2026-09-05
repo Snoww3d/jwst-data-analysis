@@ -1,7 +1,8 @@
 <!--
   CI enforces this template (`Validate PR Standards`, .github/scripts/validate-pr.js).
   Keep every `##` heading below and fill it in; the check fails on missing or
-  empty sections. Full rules: CONTRIBUTING.md → "Pull Requests".
+  empty sections. Check locally with `./scripts/validate-pr.sh`.
+  Full rules: CONTRIBUTING.md → "Pull Requests".
 -->
 No linked issue
 <!-- ↑ Replace with `Closes #N` (e.g. `Closes #1234`) if this PR closes an issue. -->

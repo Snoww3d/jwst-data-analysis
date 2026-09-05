@@ -122,7 +122,7 @@ Validate PR title, body, and branch name against the same rules used in CI. Reus
 
 # Validate before creating a PR (dry-run)
 ./scripts/validate-pr.sh --title "fix: resolve issue" --body-file /tmp/body.md --branch fix/my-fix
-```bash
+```
 
 ---
 
