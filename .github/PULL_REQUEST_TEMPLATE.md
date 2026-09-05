@@ -1,11 +1,13 @@
+<!--
+  CI enforces this template (`Validate PR Standards`, .github/scripts/validate-pr.js).
+  Keep every `##` heading below and fill it in; the check fails on missing or
+  empty sections. Full rules: CONTRIBUTING.md → "Pull Requests".
+-->
 No linked issue
 <!-- ↑ Replace with `Closes #N` (e.g. `Closes #1234`) if this PR closes an issue. -->
 
 ## Summary
-<!-- What changed and the user-visible outcome -->
-
-## Why
-<!-- Why this change is needed (bug, gap, risk, or goal) -->
+<!-- What changed, why, and the user-visible outcome -->
 
 ## Changes Made
 -
