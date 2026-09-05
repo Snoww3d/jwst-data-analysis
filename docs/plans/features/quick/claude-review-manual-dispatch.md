@@ -17,8 +17,9 @@ that exposed the problem before merging.
 
 1. **Spec** — files: `docs/plans/design/claude-review-manual-dispatch.md` — proof: danger-zone gate finds a spec in the diff
 2. **Workflow** — files: `.github/workflows/claude-code-review.yml` — proof: `actionlint` clean; the `if` expression skips forks and allows dispatch
-3. **Smoke test** — dispatch against PR #1963 from this branch — proof: run succeeds and a review comment appears on #1963
+3. **Smoke test** — dispatch against PR #1963 from this branch — proof: the dispatch is accepted and the job completes. Note: the action skips the actual review when the workflow file differs from `main` (its own guard against modified workflows), so this only proves the trigger, input, `if`, and checkout. The review itself is proven post-merge (step 5)
 4. **Verify the automatic path still runs** — this PR's own Claude review — proof: green check on this PR
+5. **Post-merge dispatch** — `gh workflow run claude-code-review.yml -f pr=1963` from `main` — proof: run succeeds and a review comment appears on #1963
 
 ## Files changed
 
@@ -31,8 +32,8 @@ that exposed the problem before merging.
 ## Test plan
 
 1. Open the PR. Expect the `Claude Code Review` check to run and pass (in-repo branch, automatic path unchanged).
-2. Run `gh workflow run claude-code-review.yml --ref ci/claude-review-manual-dispatch -f pr=1963`. Expect a run under the Actions tab that completes successfully.
-3. Open PR #1963. Expect a Claude review comment.
+2. Pre-merge: `gh workflow run claude-code-review.yml --ref ci/claude-review-manual-dispatch -f pr=1963`. Expect a run under the Actions tab that completes successfully, with the action logging that it skipped due to workflow validation (file differs from `main`). Done 2026-09-04, run 33936829763.
+3. Post-merge: `gh workflow run claude-code-review.yml -f pr=1963`. Expect a successful run and a Claude review comment on PR #1963.
 4. Confirm the fork skip: the run list for `Claude Code Review` on #1963's next push (if any) shows `skipped`, not `failure`.
 
 ## Rollback

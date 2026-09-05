@@ -70,6 +70,7 @@ None. One workflow file changes; no runtime code.
 |---------|--------------|-----------|
 | Dispatched with a PR number that does not exist | `gh pr view` fails inside the review | Job fails with a clear `gh` error; no comment posted |
 | Dispatched from a branch that lacks the `workflow_dispatch` trigger | GitHub refuses the dispatch | `gh workflow run` errors before anything runs |
+| Dispatched from a branch whose workflow file differs from `main` | The action validates the workflow against the default branch and skips itself ("Workflow validation failed ... must have identical content to the version on the repository's default branch") | Job reports success but no review runs. Observed on the pre-merge smoke test. The manual path can only be exercised for real after merge, dispatched from `main` |
 | Secret missing on dispatch | Action reports the same OIDC/token error seen on fork runs | Job fails; nothing is blocked because the check is not required |
 | Fork detection expression evaluates unexpectedly | Run appears (fails) on a fork PR, or is skipped on an in-repo PR | Visible in the Actions tab; check is advisory either way. Verified in the test plan against one fork PR and one in-repo PR |
 | Inline comments on dispatch | The action's inline-comment tool may lack PR context outside a `pull_request` event | Summary comment via `gh pr comment` still lands; inline placement is best-effort. Observed in the smoke test and recorded in the PR |
