@@ -86,7 +86,6 @@ flowchart TB
     subgraph Wizards["Composite & Mosaic Wizards"]
         CP["CompositePage"]
         CP --> ChanAssign["ChannelAssignStep"]
-        ChanAssign --> ChanCard["ChannelCard"]
         CP --> CompPreview["CompositePreviewStep"]
 
         MP["MosaicPage"]
