@@ -96,6 +96,14 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    Do not delete or rename template sections — the check looks for them by heading.
    Draft PRs are exempt until marked ready for review.
 
+   **Check locally before pushing** — same script CI runs, so the result matches:
+   ```bash
+   ./scripts/validate-pr.sh                       # validates the open PR for the current branch
+   ./scripts/validate-pr.sh 1234                  # validates PR #1234
+   ./scripts/validate-pr.sh --title "fix: foo" \
+       --body-file pr-body.md --branch fix/foo   # validates a body before the PR exists
+   ```
+
 ## Coding Standards
 
 ### Backend (.NET)
