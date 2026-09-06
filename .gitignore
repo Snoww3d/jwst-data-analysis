@@ -67,6 +67,12 @@ scripts/.sensitive-patterns
 .env.*.local
 .env.agent*
 *.env
+# Catch every .env VARIANT, not just names ending in `.env`. The rules above
+# left `.env.bak-*`, `.env.old`, `.env.save` and dated copies trackable — a
+# `git add .` away from committing live credentials. Found 2026-09-04 with two
+# such backups sitting untracked in docker/.
+.env.*
+!.env.example
 
 # IDE
 .idea/
