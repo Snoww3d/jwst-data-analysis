@@ -829,6 +829,11 @@ JWST-Analyzer/
 | Viewing single image  | < 500 MB | 1 GB      |
 | Processing large file | < 2 GB   | 4 GB      |
 
+Image readers must validate FITS header dimensions before loading payloads,
+including compressed images. Preview and pixel-data downsampling must check an
+estimated three-array allocation against 80% of available memory (respecting
+container headroom where applicable) and report insufficient memory gracefully.
+
 ---
 
 ## 9. Security Requirements
