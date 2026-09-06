@@ -10,11 +10,10 @@
  *                                     `require_spec_for_danger_zone_changes`
  *                                     is set) a spec signal.
  *
- * Human signal, either of:
- *   - an approving review from a non-bot user;
- *   - a `danger-approved` label whose most recent `labeled` event was
- *     performed by the repo owner. A solo repo cannot review its own PRs, and
- *     a label is one tap from the GitHub mobile app.
+ * Human signal: an exact head/base approval receipt, authored by the owner
+ * in the app or recorded by this workflow for the owner's label/review event.
+ * Removing danger-approved revokes earlier receipts. Later revisions require
+ * fresh approval. See danger-approval.cjs.
  *
  * Spec signal, any of:
  *   - a spec artifact in the diff under `artifacts.spec`;
@@ -32,6 +31,7 @@
 
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
+const approval = require("./danger-approval.cjs");
 
 const CONFIG_PATH = ".claude/sdlc.json";
 const APPROVAL_LABEL = "danger-approved";
@@ -67,21 +67,6 @@ function toRegExp(pattern) {
 }
 
 /**
- * Replay the label timeline and report whether `danger-approved` is currently
- * present *and* was last applied by the owner. A label applied by anyone else,
- * or removed after being applied, does not count.
- */
-function ownerLabelApproval(labelEvents, ownerLogin) {
-  let approved = false;
-  for (const ev of labelEvents) {
-    if (ev.label !== APPROVAL_LABEL) continue;
-    if (ev.event === "labeled") approved = ev.actor === ownerLogin;
-    else if (ev.event === "unlabeled") approved = false;
-  }
-  return approved;
-}
-
-/**
  * The spec path a `Spec: <path>` body line names, or null. Only a `.md`
  * directly under `config.artifacts.spec` with a plain-character path counts;
  * anything else is malformed and never looked up.
@@ -110,6 +95,9 @@ function evaluate({
   changedFiles,
   reviews = [],
   labelEvents = [],
+  comments = [],
+  head,
+  base,
   body = "",
   diffStats = { additions: 0, deletions: 0 },
   specRefExists = false,
@@ -135,14 +123,18 @@ function evaluate({
 
   // --- Human signal ---
   // A bot approving its own work is not human oversight.
-  const humanReview = reviews.some(
-    (r) => r.state === "APPROVED" && r.type !== "Bot",
-  );
-  const ownerLabel = ownerLabelApproval(labelEvents, ownerLogin);
-  if (!humanReview && !ownerLabel) {
+  if (
+    !approval.approved({
+      comments,
+      reviews,
+      labelEvents,
+      ownerLogin,
+      head,
+      base,
+    })
+  ) {
     errors.push(
-      "This PR changes a danger-zone path and has no human signal. " +
-        `Approve the PR, or (as the repo owner) apply the \`${APPROVAL_LABEL}\` label.`,
+      "This PR changes a danger-zone path and has no human signal for this head/base. Approve this revision in personal-os, or remove and reapply `danger-approved` as the owner in GitHub (including mobile). New commits or a changed base need fresh approval.",
     );
   }
 
@@ -154,7 +146,8 @@ function evaluate({
       changedFiles.some((f) => f.startsWith(specDir) && f.endsWith(".md"));
     const specRef = specReference(body, config);
     const hasSpecRef = Boolean(specRef) && specRefExists === true;
-    const changedLines = (diffStats.additions ?? 0) + (diffStats.deletions ?? 0);
+    const changedLines =
+      (diffStats.additions ?? 0) + (diffStats.deletions ?? 0);
     const hasMarker = SPEC_EXCEPTION_RE.test(body);
     const smallDiff = changedLines < SMALL_DIFF_LINES;
     if (!hasSpec && !hasSpecRef && !(hasMarker && smallDiff)) {
@@ -183,7 +176,6 @@ function evaluate({
 
 module.exports = {
   evaluate,
-  ownerLabelApproval,
   specReference,
   toRegExp,
   APPROVAL_LABEL,
@@ -208,20 +200,36 @@ function ghJson(path, paginate = false) {
 }
 
 function main() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.log(`No ${CONFIG_PATH}; nothing to gate.`);
-    return;
+  const { HEAD_SHA, PR_NUMBER, REPO } = process.env;
+  // A rerun keeps its original event payload. Read the current base so an app
+  // receipt for a newly reviewed base can be evaluated without an empty commit.
+  const live = ghJson(`repos/${REPO}/pulls/${PR_NUMBER}`);
+  if (
+    live.head?.sha !== HEAD_SHA ||
+    live.base?.repo?.full_name !== REPO ||
+    live.state !== "open" ||
+    live.draft ||
+    !/^[0-9a-f]{40}$/.test(live.base?.sha ?? "")
+  ) {
+    fail([
+      "PR head changed, closed or became a draft; evaluate the current revision.",
+    ]);
   }
-  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+  const BASE_SHA = live.base.sha;
+  execFileSync("git", ["fetch", "origin", BASE_SHA], { stdio: "pipe" });
+  const config = JSON.parse(
+    execFileSync("git", ["show", `${BASE_SHA}:${CONFIG_PATH}`], {
+      encoding: "utf8",
+    }),
+  );
   if ((config.danger_zones?.paths ?? []).length === 0) {
     console.log("No danger zones declared; nothing to gate.");
     return;
   }
 
-  const { BASE_SHA, HEAD_SHA, PR_NUMBER, REPO } = process.env;
   const changedFiles = execFileSync(
     "git",
-    ["diff", "--name-only", `${BASE_SHA}...${HEAD_SHA}`],
+    ["diff", "--no-renames", "--name-only", `${BASE_SHA}...${HEAD_SHA}`],
     { encoding: "utf8" },
   )
     .split("\n")
@@ -239,28 +247,85 @@ function main() {
   }
 
   console.log("Danger-zone paths touched by this PR:\n");
-  for (const { file, pattern } of dry.hits) console.log(`  ${file}   (${pattern})`);
+  for (const { file, pattern } of dry.hits)
+    console.log(`  ${file}   (${pattern})`);
   console.log("");
 
-  let reviews, labelEvents, pr, ownerLogin;
+  let reviews, labelEvents, pr, ownerLogin, comments;
   let specRefExists = false;
   try {
     reviews = ghJson(`repos/${REPO}/pulls/${PR_NUMBER}/reviews`, true).map(
-      (r) => ({ state: r.state, user: r.user?.login, type: r.user?.type }),
+      (r) => ({
+        id: r.id,
+        commit_id: r.commit_id,
+        state: r.state,
+        user: r.user?.login,
+        type: r.user?.type,
+      }),
     );
     // Issue events carry the actor of each label change; the PR's current
     // label list does not say who applied it.
     labelEvents = ghJson(`repos/${REPO}/issues/${PR_NUMBER}/events`, true)
       .filter((e) => e.event === "labeled" || e.event === "unlabeled")
-      .map((e) => ({ event: e.event, label: e.label?.name, actor: e.actor?.login }));
+      .map((e) => ({
+        id: e.id,
+        created_at: e.created_at,
+        event: e.event,
+        label: e.label?.name,
+        actor: e.actor?.login,
+      }));
     pr = ghJson(`repos/${REPO}/pulls/${PR_NUMBER}`);
     ownerLogin = ghJson(`repos/${REPO}`).owner.login;
+    if (
+      pr.head.sha !== HEAD_SHA ||
+      pr.base.sha !== BASE_SHA ||
+      pr.state !== "open" ||
+      pr.draft
+    )
+      throw new Error("PR revision changed; evaluate the current revision");
+    comments = ghJson(
+      `repos/${REPO}/issues/${PR_NUMBER}/comments?per_page=100`,
+      true,
+    );
+    const event = process.env.GITHUB_EVENT_PATH
+      ? JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"))
+      : {};
+    const receipt = approval.fromEvent(event, ownerLogin, labelEvents);
+    if (
+      receipt &&
+      !comments.some(
+        (c) =>
+          c.user?.login === "github-actions[bot]" &&
+          c.body === approval.body(receipt),
+      )
+    ) {
+      const comment = JSON.parse(
+        execFileSync(
+          "gh",
+          [
+            "api",
+            "--method",
+            "POST",
+            `repos/${REPO}/issues/${PR_NUMBER}/comments`,
+            "--input",
+            "-",
+          ],
+          {
+            input: JSON.stringify({ body: approval.body(receipt) }),
+            encoding: "utf8",
+          },
+        ),
+      );
+      comments.push(comment);
+    }
+
     // A referenced spec must exist at the PR head. A 404 is a failed lookup
     // like any other; the gate stays closed either way.
     const specRef = specReference(pr.body, config);
     specRefExists =
       specRef !== null &&
-      ghJson(`repos/${REPO}/contents/${specRef}?ref=${HEAD_SHA}`).type === "file";
+      ghJson(`repos/${REPO}/contents/${specRef}?ref=${HEAD_SHA}`).type ===
+        "file";
   } catch (err) {
     fail([
       `Could not read PR #${PR_NUMBER} state from GitHub: ${err.message}`,
@@ -272,6 +337,9 @@ function main() {
     changedFiles,
     reviews,
     labelEvents,
+    comments,
+    head: HEAD_SHA,
+    base: BASE_SHA,
     body: pr.body,
     diffStats: { additions: pr.additions, deletions: pr.deletions },
     specRefExists,
