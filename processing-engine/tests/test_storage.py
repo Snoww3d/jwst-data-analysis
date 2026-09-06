@@ -80,6 +80,42 @@ class TestLocalStorage:
         with pytest.raises(ValueError, match="Invalid storage key"):
             tmp_storage.read_to_temp("../../etc/shadow")
 
+    @pytest.mark.parametrize("key_kind", ["relative", "absolute", "symlink"])
+    @pytest.mark.parametrize("operation", ["read", "write", "copy", "exists", "delete", "resolve"])
+    def test_prefix_collision_blocked(self, tmp_path, key_kind, operation):
+        base, sibling = tmp_path / "data", tmp_path / "data2"
+        base.mkdir()
+        sibling.mkdir()
+        victim = sibling / "secret.fits"
+        victim.write_bytes(b"original")
+        (base / "link").symlink_to(sibling, target_is_directory=True)
+        key = {
+            "relative": "../data2/secret.fits",
+            "absolute": str(victim),
+            "symlink": "link/secret.fits",
+        }[key_kind]
+        storage = LocalStorage(str(base))
+        operations = {
+            "read": lambda: storage.read_to_temp(key),
+            "write": lambda: storage.write_from_bytes(key, b"bad"),
+            "copy": lambda: storage.write_from_path(key, victim),
+            "exists": lambda: storage.exists(key),
+            "delete": lambda: storage.delete(key),
+            "resolve": lambda: storage.resolve_local_path(key),
+        }
+        with pytest.raises(ValueError, match="Invalid storage key"):
+            operations[operation]()
+        assert victim.read_bytes() == b"original"
+
+    def test_contained_symlink_and_normalized_path(self, tmp_path):
+        base = tmp_path / "data"
+        (base / "nested").mkdir(parents=True)
+        (base / "link").symlink_to(base / "nested", target_is_directory=True)
+        storage = LocalStorage(str(base))
+        assert storage.resolve_local_path("link/./new.fits") == base / "nested/new.fits"
+        assert storage.resolve_local_path("nested/../new.fits") == base / "new.fits"
+        assert storage.resolve_local_path("") == base
+
 
 class TestStorageFactory:
     def setup_method(self):
