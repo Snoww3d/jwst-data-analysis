@@ -58,7 +58,7 @@ flowchart LR
     subgraph Queues["Job Queues"]
         CompositeQ["CompositeQueue\n(Bounded, cap=10)"]
         MosaicQ["MosaicQueue\n(Bounded, cap=10)"]
-        ThumbnailQ["ThumbnailQueue\n(Unbounded)"]
+        ThumbnailQ["ThumbnailQueue\n(Bounded: 50)"]
     end
 
     subgraph Workers["Background Services"]

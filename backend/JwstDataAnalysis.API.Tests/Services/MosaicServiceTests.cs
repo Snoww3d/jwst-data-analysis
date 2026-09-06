@@ -493,7 +493,7 @@ public class MosaicServiceTests
 
         // Assert
         mockMongo.Verify(m => m.CreateAsync(It.IsAny<JwstDataModel>()), Times.Once);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Once);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>

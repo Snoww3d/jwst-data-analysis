@@ -920,7 +920,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Queue thumbnail generation for records that don't have thumbnails
                 var thumbnailIds = await mongoDBService.GetViewableWithoutThumbnailIdsAsync();
-                thumbnailQueue.EnqueueBatch(thumbnailIds);
+                await thumbnailQueue.EnqueueBatchAsync(thumbnailIds);
 
                 return Ok(new MetadataRefreshResponse
                 {
@@ -1649,7 +1649,7 @@ namespace JwstDataAnalysis.API.Controllers
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
                 await EstablishLineageRelationships(importedIds);
 
-                thumbnailQueue.EnqueueBatch(importedIds);
+                await thumbnailQueue.EnqueueBatchAsync(importedIds, cancellationToken);
 
                 // Detect and queue observation mosaics for large per-detector file groups
                 if (commonObservationBaseId != null)
@@ -1825,7 +1825,7 @@ namespace JwstDataAnalysis.API.Controllers
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
                 await EstablishLineageRelationships(importedIds);
 
-                thumbnailQueue.EnqueueBatch(importedIds);
+                await thumbnailQueue.EnqueueBatchAsync(importedIds, cancellationToken);
 
                 // Detect and queue observation mosaics for large per-detector file groups
                 if (commonObservationBaseId != null)

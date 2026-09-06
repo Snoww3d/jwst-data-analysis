@@ -56,7 +56,7 @@ namespace JwstDataAnalysis.API.Services
                 var missingThumbnailIds = await mongoDBService.GetViewableWithoutThumbnailIdsAsync();
                 if (missingThumbnailIds.Count > 0)
                 {
-                    thumbnailQueue.EnqueueBatch(missingThumbnailIds);
+                    await thumbnailQueue.EnqueueBatchAsync(missingThumbnailIds, stoppingToken);
                     LogEnqueuedMissingThumbnails(missingThumbnailIds.Count);
                 }
             }

@@ -9,6 +9,6 @@ namespace JwstDataAnalysis.API.Services
     {
         int PendingCount { get; }
 
-        void EnqueueBatch(List<string> dataIds);
+        Task EnqueueBatchAsync(List<string> dataIds, CancellationToken cancellationToken = default);
     }
 }
