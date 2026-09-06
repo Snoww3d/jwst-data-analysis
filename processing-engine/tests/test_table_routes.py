@@ -1,5 +1,7 @@
 """Tests for FITS Table Viewer endpoints and helper functions."""
 
+import logging
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -7,7 +9,7 @@ import pytest
 from astropy.io import fits as astropy_fits
 from fastapi.testclient import TestClient
 
-from app.analysis.routes import _safe_str, _serialize_cell
+from app.analysis.routes import _parse_tdim, _safe_str, _serialize_cell
 from app.storage.local_storage import LocalStorage
 
 
@@ -74,6 +76,60 @@ def storage_patch(tmp_path):
         _STORAGE_PATCH_TARGET,
         return_value=LocalStorage(base_path=str(tmp_path)),
     )
+
+
+# ---------------------------------------------------------------------------
+# TDIM parsing tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "dim, expected",
+    [(None, None), ("", None), ("()", None), ("(,)", None), ("(10,)", [10]), ("(3, 4)", [3, 4])],
+)
+def test_parse_tdim(dim, expected):
+    assert _parse_tdim(SimpleNamespace(name="spectrum", dim=dim)) == expected
+
+
+def test_parse_tdim_malformed_logs_column_and_raw_value(caplog):
+    with caplog.at_level(logging.WARNING, logger="app.analysis.routes"):
+        assert _parse_tdim(SimpleNamespace(name="spectrum", dim="(10,a)")) is None
+
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.WARNING
+    assert "spectrum" in caplog.text
+    assert "(10,a)" in caplog.text
+
+
+@pytest.mark.parametrize("endpoint", ["table-info", "table-data"])
+@pytest.mark.parametrize("dim, expected", [(None, [10]), ("(2,5)", [2, 5]), ("(10,a)", None)])
+def test_table_endpoints_tdim_metadata(
+    client, tmp_path, storage_patch, caplog, endpoint, dim, expected
+):
+    col = astropy_fits.Column(name="spectrum", format="10E", array=np.zeros((2, 10)))
+    hdu = astropy_fits.BinTableHDU.from_columns([col])
+    if dim is not None:
+        # Write raw metadata so malformed TDIM reaches the actual FITS reader.
+        hdu.header["TDIM1"] = dim
+    astropy_fits.HDUList([astropy_fits.PrimaryHDU(), hdu]).writeto(tmp_path / "tdim.fits")
+
+    with storage_patch, caplog.at_level(logging.WARNING, logger="app.analysis.routes"):
+        response = client.get(
+            f"/analysis/{endpoint}", params={"file_path": "tdim.fits", "hdu_index": 1}
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    metadata = data["table_hdus"][0] if endpoint == "table-info" else data
+    column = metadata["columns"][0]
+    assert column["array_shape"] == expected
+    assert column["is_array"] is (expected is not None)
+    if expected is None:
+        assert "spectrum" in caplog.text
+        assert dim in caplog.text
+    if endpoint == "table-data":
+        assert data["total_rows"] == 2
+        assert len(data["rows"]) == 2
 
 
 # ---------------------------------------------------------------------------

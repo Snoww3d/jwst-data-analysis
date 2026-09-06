@@ -495,6 +495,17 @@ def _read_ecsv(local_path: Path) -> Table:
         raise HTTPException(status_code=400, detail="File is not a readable ECSV table") from exc
 
 
+def _parse_tdim(col: fits.Column) -> list[int] | None:
+    """Parse FITS TDIM metadata, treating malformed dimensions as scalar."""
+    if col.dim is None:
+        return None
+    try:
+        return [int(x.strip()) for x in col.dim.strip("()").split(",") if x.strip()] or None
+    except ValueError:
+        logger.warning("Invalid TDIM %r for column %s; treating as scalar", col.dim, col.name)
+        return None
+
+
 @router.get("/table-info", response_model=TableInfoResponse)
 def get_table_info(file_path: str):
     """
@@ -534,11 +545,8 @@ def get_table_info(file_path: str):
 
                 # Detect array columns (e.g. "10E" = array of 10 floats)
                 if col.dim is not None:
-                    is_array = True
-                    # Parse TDIM string like "(10,)" or "(3,4)"
-                    dim_str = col.dim.strip("()")
-                    if dim_str:
-                        array_shape = [int(x.strip()) for x in dim_str.split(",") if x.strip()]
+                    array_shape = _parse_tdim(col)
+                    is_array = array_shape is not None
                 elif len(col.format) > 1 and col.format[:-1].isdigit() and int(col.format[:-1]) > 1:
                     is_array = True
                     array_shape = [int(col.format[:-1])]
@@ -713,10 +721,8 @@ def get_table_data(
             is_array = False
             array_shape = None
             if col.dim is not None:
-                is_array = True
-                dim_str = col.dim.strip("()")
-                if dim_str:
-                    array_shape = [int(x.strip()) for x in dim_str.split(",") if x.strip()]
+                array_shape = _parse_tdim(col)
+                is_array = array_shape is not None
             elif len(col.format) > 1 and col.format[:-1].isdigit() and int(col.format[:-1]) > 1:
                 is_array = True
                 array_shape = [int(col.format[:-1])]
