@@ -31,6 +31,7 @@
       "docker/.env*",
       "docker/docker-compose*.yml",
       ".github/workflows/**",
+      ".github/scripts/**",
       ".claude/hooks/**",
       ".claude/sdlc.json",
       "scripts/server-setup-prod.sh",
