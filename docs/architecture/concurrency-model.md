@@ -70,6 +70,11 @@ The backend uses .NET `BoundedChannel<T>` for async job queues with dedicated `B
 
 ### Queue Behavior
 
+Thumbnail producers await space when 50 batches are buffered. Warning event 8005
+reports occupancy when an enqueue sees at least 40 buffered batches. PendingCount
+includes waiting, buffered, and processing batches, so it may exceed 50. Capacity
+limits batch count, not the number of IDs in each batch.
+
 ```
 API Request (POST /api/composite/export-nchannel)
   ↓
