@@ -1,6 +1,6 @@
 # Plan: Render zoom memory guard
 
-- **Status:** approved
+- **Status:** done
 - **Spec:** [1105-zoom-memory-guard](../../design/1105-zoom-memory-guard.md)
 - **Branch:** `feature/card-1105`
 - **Issue:** #1105, #1825
@@ -36,6 +36,18 @@ FITS size validation ahead of payload access. Preserve interpolation and output.
 2. Commit hook: Python lint, formatting and documentation consistency pass.
 3. Docker pytest full default suite passes; opt-in memory/calibration suites
    retain their existing exclusion. No browser UI or cross-service flow changes.
+
+### Validation results (2026-09-06)
+
+- Focused regression suite: 30 passed.
+- Full Docker pytest with isolated MongoDB: 2,113 passed, 2 deselected;
+  79.36% coverage (60% CI threshold passed).
+- Frontend: 1,819 tests passed; lint has zero errors (122 warnings), format and
+  TypeScript checks passed. .NET: 1,185 tests passed; build has zero warnings/errors.
+- Commit hooks: Python lint/format, secrets and documentation consistency passed.
+- REVIEW.md self-review: no unresolved findings; both zoom consumers and the CE
+  facade error propagation inspected. Session retro: provision CI's MongoDB
+  dependency before full-suite runs; the first run had only missing-URI errors.
 
 ## Rollback
 

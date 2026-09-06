@@ -1,6 +1,6 @@
 # Spec: Render zoom memory guard
 
-- **Status:** approved for implementation by card #1105
+- **Status:** implemented
 - **Intent:** issues #1105 and #1825
 - **Date:** 2026-09-06
 
