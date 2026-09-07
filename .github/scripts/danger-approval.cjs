@@ -84,12 +84,19 @@ function fromEvent(event, ownerLogin, labelEvents) {
     const latest = labelEvents
       .filter((e) => e.label === "danger-approved")
       .at(-1);
-    // Match this delivery, not a later reapplication, including repeated runs.
+    // Match this delivery by event id, not by timestamp. A concurrent CI check
+    // or review can bump pr.updated_at between the label event and the handler
+    // calling the issue-events API, causing a false negative (#1994). The event
+    // id is stable across replays and doesn't race with concurrent PR updates.
+    // The approved() function already verifies latest.id === r.eventId against
+    // the current label events, so a reapplication (new event id) correctly
+    // invalidates the old receipt, and a repeated run of the same event id is
+    // deduplicated by the comment body check (r.head !== head).
     if (
       latest?.event !== "labeled" ||
       latest.actor !== ownerLogin ||
-      !latest.id ||
-      latest.created_at !== pr.updated_at
+      !Number.isSafeInteger(latest.id) ||
+      latest.id <= 0
     )
       return null;
     return { head, base, source: "label", eventId: latest.id };
