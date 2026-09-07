@@ -104,23 +104,18 @@ constraints in [`AGENTS.md`](AGENTS.md).
 
 ## Danger zones
 
-`danger_zones.paths` in `.claude/sdlc.json` lists the paths where a mistake is
-expensive. A PR touching one requires a human signal and a spec, and the
-`Danger Zone` check enforces both. The human signal is an approving review from
-a non-bot, or the `danger-approved` label applied by the repo owner. The spec
-signal is a spec in the diff, a `Spec: docs/plans/design/<name>.md` body line
-naming one already on `main`, or for diffs under 200 lines a
-`SDLC-Exception: plan-in-pr-body` body line.
+Paths listed in `.claude/sdlc.json` require a spec and owner approval for the
+current PR head and base. The app's **Review danger approval** preview records
+an owner-authored receipt. Applying `danger-approved` in GitHub mobile records
+an event-scoped workflow receipt. An owner approving review also requires its
+matching revision receipt.
 
-When reviewing such a PR, spend the extra attention there rather than spreading
-it evenly. When reviewing a PR that touches none of them, do not invent gravity
-it does not have.
+New commits or a changed base require fresh approval. Remove and reapply the
+mobile label after reviewing a new revision; removing it revokes earlier
+receipts. Replies and dispatcher Resume actions are not danger approval.
+Merging remains separate. API or receipt-publication failures hold the gate.
 
-If a review finds a dangerous path that is **not** on the list, adding it to the
-list is part of resolving the finding.
-
-## Do not re-review what hooks enforce
-
-Pre-commit already runs ESLint, Prettier, `tsc`, vitest, `dotnet build`+`test`,
-and ruff. Reviewing formatting by hand wastes the review. Focus on what a hook
-cannot check: intent, contracts, security, and blast radius.
+The spec signal remains a spec in the diff, a `Spec: docs/plans/design/<name>.md`
+reference to a file at the PR head, or `SDLC-Exception: plan-in-pr-body` for
+fewer than 200 changed lines. Base policy and both sides of renames determine
+which files are sensitive. Gate scripts themselves are protected paths.

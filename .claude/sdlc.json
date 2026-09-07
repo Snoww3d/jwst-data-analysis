@@ -36,7 +36,8 @@
       ".claude/hooks/**",
       ".claude/sdlc.json",
       "scripts/server-setup-prod.sh",
-      "scripts/public-preflight.sh"
+      "scripts/public-preflight.sh",
+      ".github/scripts/danger*.cjs"
     ]
   }
 }

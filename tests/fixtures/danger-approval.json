@@ -1,0 +1,292 @@
+[
+  {
+    "name": "owner app receipt",
+    "expected": true,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "me",
+          "type": "User"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"app\"} -->"
+      }
+    ],
+    "labelEvents": [],
+    "reviews": []
+  },
+  {
+    "name": "old head",
+    "expected": false,
+    "head": "cccccccccccccccccccccccccccccccccccccccc",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "me",
+          "type": "User"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"app\"} -->"
+      }
+    ],
+    "labelEvents": [],
+    "reviews": []
+  },
+  {
+    "name": "old base",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "cccccccccccccccccccccccccccccccccccccccc",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "me",
+          "type": "User"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"app\"} -->"
+      }
+    ],
+    "labelEvents": [],
+    "reviews": []
+  },
+  {
+    "name": "foreign author",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "stranger",
+    "comments": [
+      {
+        "user": {
+          "login": "me",
+          "type": "User"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"app\"} -->"
+      }
+    ],
+    "labelEvents": [],
+    "reviews": []
+  },
+  {
+    "name": "revoked receipt",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "me",
+          "type": "User"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"app\"} -->"
+      }
+    ],
+    "labelEvents": [
+      {
+        "id": 1,
+        "event": "unlabeled",
+        "label": "danger-approved",
+        "actor": "me",
+        "created_at": "2026-09-06T12:00:02Z"
+      }
+    ],
+    "reviews": []
+  },
+  {
+    "name": "mobile receipt",
+    "expected": true,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "github-actions[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"label\",\"eventId\":1} -->"
+      }
+    ],
+    "labelEvents": [
+      {
+        "id": 1,
+        "event": "labeled",
+        "label": "danger-approved",
+        "actor": "me",
+        "created_at": "2026-09-06T12:00:00Z"
+      }
+    ],
+    "reviews": []
+  },
+  {
+    "name": "replaced label event",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "github-actions[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"label\",\"eventId\":1} -->"
+      }
+    ],
+    "labelEvents": [
+      {
+        "id": 1,
+        "event": "labeled",
+        "label": "danger-approved",
+        "actor": "me",
+        "created_at": "2026-09-06T12:00:00Z"
+      },
+      {
+        "id": 2,
+        "event": "labeled",
+        "label": "danger-approved",
+        "actor": "me",
+        "created_at": "2026-09-06T12:00:00Z"
+      }
+    ],
+    "reviews": []
+  },
+  {
+    "name": "foreign label",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "github-actions[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"label\",\"eventId\":1} -->"
+      }
+    ],
+    "labelEvents": [
+      {
+        "id": 1,
+        "event": "labeled",
+        "label": "danger-approved",
+        "actor": "stranger",
+        "created_at": "2026-09-06T12:00:00Z"
+      }
+    ],
+    "reviews": []
+  },
+  {
+    "name": "label without receipt",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [],
+    "labelEvents": [
+      {
+        "id": 1,
+        "event": "labeled",
+        "label": "danger-approved",
+        "actor": "me",
+        "created_at": "2026-09-06T12:00:00Z"
+      }
+    ],
+    "reviews": []
+  },
+  {
+    "name": "untrusted bot",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "other[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"label\",\"eventId\":1} -->"
+      }
+    ],
+    "labelEvents": [
+      {
+        "id": 1,
+        "event": "labeled",
+        "label": "danger-approved",
+        "actor": "me",
+        "created_at": "2026-09-06T12:00:00Z"
+      }
+    ],
+    "reviews": []
+  },
+  {
+    "name": "owner review receipt",
+    "expected": true,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "github-actions[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"review\",\"eventId\":7} -->"
+      }
+    ],
+    "labelEvents": [],
+    "reviews": [
+      {
+        "id": 7,
+        "user": "me",
+        "type": "User",
+        "state": "APPROVED",
+        "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  {
+    "name": "dismissed review",
+    "expected": false,
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ownerLogin": "me",
+    "comments": [
+      {
+        "user": {
+          "login": "github-actions[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-09-06T12:00:01Z",
+        "body": "<!-- pos-danger-approval:v1 {\"head\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"base\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source\":\"review\",\"eventId\":7} -->"
+      }
+    ],
+    "labelEvents": [],
+    "reviews": [
+      {
+        "id": 7,
+        "user": "me",
+        "type": "User",
+        "state": "DISMISSED",
+        "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  }
+]
