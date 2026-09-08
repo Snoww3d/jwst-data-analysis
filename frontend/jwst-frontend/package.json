@@ -10,7 +10,7 @@
     "plotly.js-basic-dist-min": "^3.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-plotly.js": "^4.0.0",
+    "react-plotly.js": "^4.1.0",
     "react-router-dom": "^7.18.2",
     "sonner": "^2.0.7"
   },
