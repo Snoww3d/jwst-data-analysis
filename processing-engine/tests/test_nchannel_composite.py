@@ -6,7 +6,7 @@ the color resolution helper, and the extracted pipeline functions.
 """
 
 import io
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -190,6 +190,71 @@ class TestNCacheKey:
         k1 = CompositeCache.make_key_nchannel([["a.fits"], ["b.fits"]], 1000)
         k2 = CompositeCache.make_key_nchannel([["b.fits"], ["a.fits"]], 1000)
         assert k1 != k2
+
+
+class TestCacheReadEviction:
+    """Cross-budget reads release expired arrays, including on early hits."""
+
+    @pytest.mark.parametrize("requested_path", ["expired.fits", "missing.fits"])
+    def test_miss_removes_expired_entries(self, monkeypatch, requested_path):
+        monkeypatch.setenv("COMPOSITE_CACHE_TTL_SECONDS", "10")
+        clock = Mock(return_value=0.0)
+        monkeypatch.setattr("app.composite.cache.time.monotonic", clock)
+        cache = CompositeCache()
+        channels = {"ch0": np.zeros((2, 2))}
+        cache.put("expired", channels, [["expired.fits"]])
+        clock.return_value = 5.0
+        cache.put("live", channels, [["live.fits"]])
+
+        clock.return_value = 11.0
+        assert cache.get_any_budget([[requested_path]]) is None
+        assert list(cache._store) == ["live"]
+
+        clock.return_value = 16.0
+        assert cache.get_any_budget([[requested_path]]) is None
+        assert not cache._store
+        assert cache._total_bytes() == 0
+
+    def test_hit_removes_expired_entries_after_match(self, monkeypatch):
+        monkeypatch.setenv("COMPOSITE_CACHE_TTL_SECONDS", "10")
+        clock = Mock(return_value=0.0)
+        monkeypatch.setattr("app.composite.cache.time.monotonic", clock)
+        cache = CompositeCache()
+        channels = {"ch0": np.zeros((2, 2))}
+        cache.put("expired", channels, [["expired.fits"]])
+        clock.return_value = 5.0
+        cache.put("live", channels, [["live.fits"]], original_shape=(4, 4))
+        # A read changes LRU order without refreshing the entry's TTL.
+        assert cache.get("expired") is not None
+        assert list(cache._store) == ["live", "expired"]
+
+        clock.return_value = 11.0
+        result = cache.get_any_budget([["live.fits"]])
+        assert result is not None
+        assert result[0] is channels
+        assert result[1] == (4, 4)
+        assert list(cache._store) == ["live"]
+        assert cache._total_bytes() == channels["ch0"].nbytes
+
+    def test_ttl_boundary_and_lru_order_are_preserved(self, monkeypatch):
+        monkeypatch.setenv("COMPOSITE_CACHE_TTL_SECONDS", "10")
+        clock = Mock(return_value=0.0)
+        monkeypatch.setattr("app.composite.cache.time.monotonic", clock)
+        cache = CompositeCache()
+        channels = {"ch0": np.zeros((2, 2))}
+        cache.put("first", channels, [["first.fits"]])
+        cache.put("second", channels, [["second.fits"]])
+
+        clock.return_value = 10.0
+        result = cache.get_any_budget([["first.fits"]])
+        assert result is not None
+        assert result[0] is channels
+        assert result[1] is None
+        assert list(cache._store) == ["second", "first"]
+
+        clock.return_value = 10.1
+        assert cache.get_any_budget([["first.fits"]]) is None
+        assert not cache._store
 
 
 class TestCacheProvenance:
