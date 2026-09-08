@@ -247,7 +247,7 @@ namespace JwstDataAnalysis.API.Services
             };
 
             await mongoDBService.CreateAsync(model);
-            thumbnailQueue.EnqueueBatch([model.Id!]);
+            await thumbnailQueue.EnqueueBatchAsync([model.Id!]);
 
             LogSavedMosaicFits(model.Id, model.FileName, model.FileSize);
 
@@ -391,7 +391,7 @@ namespace JwstDataAnalysis.API.Services
             };
 
             await mongoDBService.CreateAsync(model);
-            thumbnailQueue.EnqueueBatch([model.Id!]);
+            await thumbnailQueue.EnqueueBatchAsync([model.Id!], cancellationToken);
 
             LogSavedObservationMosaic(model.Id, model.FileName, model.FileSize, sourceDataIds.Count);
 

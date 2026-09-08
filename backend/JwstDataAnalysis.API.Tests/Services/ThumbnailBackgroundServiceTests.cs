@@ -24,7 +24,7 @@ public class ThumbnailBackgroundServiceTests : IDisposable
 
     public ThumbnailBackgroundServiceTests()
     {
-        queue = new ThumbnailQueue();
+        queue = new ThumbnailQueue(Mock.Of<ILogger<ThumbnailQueue>>());
         mockThumbnailService = new Mock<IThumbnailService>();
         mockLogger = new Mock<ILogger<ThumbnailBackgroundService>>();
 
@@ -48,7 +48,7 @@ public class ThumbnailBackgroundServiceTests : IDisposable
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
-        queue.EnqueueBatch(ids);
+        await queue.EnqueueBatchAsync(ids);
 
         using var cts = new CancellationTokenSource();
 
@@ -88,8 +88,8 @@ public class ThumbnailBackgroundServiceTests : IDisposable
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
-        queue.EnqueueBatch(failBatch);
-        queue.EnqueueBatch(okBatch);
+        await queue.EnqueueBatchAsync(failBatch);
+        await queue.EnqueueBatchAsync(okBatch);
 
         using var cts = new CancellationTokenSource();
 
@@ -117,21 +117,21 @@ public class ThumbnailBackgroundServiceTests : IDisposable
     }
 
     [Fact]
-    public void EmptyListIsNotEnqueued()
+    public async Task EmptyListIsNotEnqueued()
     {
         // Act
-        queue.EnqueueBatch([]);
+        await queue.EnqueueBatchAsync([]);
 
         // Assert
         queue.PendingCount.Should().Be(0);
     }
 
     [Fact]
-    public void PendingCountReflectsBatches()
+    public async Task PendingCountReflectsBatches()
     {
         // Act
-        queue.EnqueueBatch(new List<string> { "a" });
-        queue.EnqueueBatch(new List<string> { "b", "c" });
+        await queue.EnqueueBatchAsync(new List<string> { "a" });
+        await queue.EnqueueBatchAsync(new List<string> { "b", "c" });
 
         // Assert — each EnqueueBatch call is one item in the channel
         queue.PendingCount.Should().Be(2);
