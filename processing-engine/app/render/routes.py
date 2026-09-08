@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from app.diagnostics import check_zoom_memory
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -56,7 +57,8 @@ def _extract_thumbnail_data(file_path: str, *, use_memmap: bool = True) -> np.nd
     try:
         with fits.open(file_path, memmap=use_memmap) as hdul:
             for hdu in hdul:
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                if len(getattr(hdu, "shape", ()) or ()) >= 2:
+                    validate_fits_array_size(hdu.shape)
                     slice_data = hdu.data
                     while len(slice_data.shape) > 2:
                         mid_idx = slice_data.shape[0] // 2
@@ -95,9 +97,8 @@ def generate_thumbnail(request: ThumbnailRequest):
     """
     # Resolve storage key to local path (works with local or S3 storage)
     local_path = resolve_fits_path(request.file_path)
-    # Note: No file size validation for thumbnails — astropy uses memory-mapped
-    # access by default, and we subsample large arrays before loading into memory.
-    # The output is always a 256x256 PNG regardless of input size.
+    # Header dimensions are validated before data access, including for compressed
+    # and scaled images that cannot rely on memory mapping to bound allocation.
     logger.info(f"Generating thumbnail for: {local_path}")
 
     # Read FITS file — try memmap first, fall back for BZERO/BSCALE files
@@ -253,13 +254,12 @@ def generate_preview(
         # Find the first image extension with 2D data
         data = None
         for i, hdu in enumerate(hdul):
-            if hdu.data is not None:
-                logger.info(f"HDU {i}: shape={hdu.data.shape}, dtype={hdu.data.dtype}")
-                if len(hdu.data.shape) >= 2:
-                    # Security: Validate array size before loading into memory
-                    validate_fits_array_size(hdu.data.shape)
-                    data = hdu.data.astype(np.float32)
-                    break
+            if len(getattr(hdu, "shape", ()) or ()) >= 2:
+                logger.info(f"HDU {i}: shape={hdu.shape}")
+                # Security: Validate header dimensions before accessing the payload.
+                validate_fits_array_size(hdu.shape)
+                data = hdu.data.astype(np.float32)
+                break
 
         if data is None:
             raise HTTPException(status_code=400, detail="No image data found in FITS file")
@@ -308,7 +308,14 @@ def generate_preview(
             scale = max_dim / max(h, w)
             from scipy import ndimage
 
-            data = ndimage.zoom(data, scale, order=1)
+            try:
+                check_zoom_memory(data)
+                data = ndimage.zoom(data, scale, order=1)
+            except MemoryError as exc:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Insufficient memory to downsample image. Retry later or use a smaller image.",
+                ) from exc
             logger.info(f"Downsampled from ({h}, {w}) to {data.shape} for preview")
 
         # Handle NaN values
@@ -526,9 +533,9 @@ def get_histogram(
         # Find the first image extension with 2D data
         data = None
         for _i, hdu in enumerate(hdul):
-            if hdu.data is not None and len(hdu.data.shape) >= 2:
+            if len(getattr(hdu, "shape", ()) or ()) >= 2:
                 # Security: Validate array size before loading into memory
-                validate_fits_array_size(hdu.data.shape)
+                validate_fits_array_size(hdu.shape)
                 data = hdu.data.astype(np.float32)
                 break
 
@@ -696,9 +703,9 @@ def get_pixel_data(
         data = None
         header = None
         for hdu in hdul:
-            if hdu.data is not None and len(hdu.data.shape) >= 2:
+            if len(getattr(hdu, "shape", ()) or ()) >= 2:
                 # Security: Validate array size before loading into memory
-                validate_fits_array_size(hdu.data.shape)
+                validate_fits_array_size(hdu.shape)
                 data = hdu.data.astype(np.float32)
                 header = hdu.header
                 break
@@ -737,7 +744,14 @@ def get_pixel_data(
             from scipy import ndimage
 
             zoom_factor = (new_height / height, new_width / width)
-            data = ndimage.zoom(data, zoom_factor, order=1)
+            try:
+                check_zoom_memory(data)
+                data = ndimage.zoom(data, zoom_factor, order=1)
+            except MemoryError as exc:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Insufficient memory to downsample image. Retry later or use a smaller image.",
+                ) from exc
             logger.info(f"Downsampled from {height}x{width} to {data.shape}")
 
         # Handle NaN values - replace with 0 for display purposes

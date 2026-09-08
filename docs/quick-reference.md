@@ -75,6 +75,12 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 - `GET /jwstdata/{id}/thumbnail` - Get thumbnail image for a record
 
 **Viewer Operations** (FITS preview):
+
+The Python engine rejects oversized FITS header dimensions before reading image
+payloads in preview, histogram, pixeldata and thumbnail routes. Preview/pixeldata
+downsampling returns HTTP 413 when its memory estimate exceeds 80% of available
+host/container headroom, or scipy raises `MemoryError` (#1105, #1825).
+
 - `GET /jwstdata/{id}/preview` - Generate preview image
   - `cmap`: inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow
   - `stretch`: zscale, asinh, log, sqrt, power, histeq, linear
@@ -242,4 +248,3 @@ See [`docs/mast-usage.md`](mast-usage.md) for detailed API examples, metadata fi
 | `ENGINE_PROXY_TARGET` (frontend) | `http://processing-engine:8000` in Docker; `http://localhost:8000` otherwise | Where the Vite dev server forwards `/api/calibration` and `/api/jobs` |
 
 Build arg `INSTALL_CALIBRATION` (default `true`; CE builds pass `false`) gates the ~2GB `jwst` layer.
-
