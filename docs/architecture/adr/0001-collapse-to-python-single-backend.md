@@ -100,6 +100,14 @@ deletes the gateway.
 > full Phase-5 cutover. Token *issuance* and the write persistence layer remain
 > in .NET. See [calibration-pipeline-flow](../calibration-pipeline-flow.md).
 
+> **Auth foundation (2026-09, #1991):** Python now implements register/login/refresh
+> and users persistence with existing bcrypt hashes, BSON fields and JWT claims.
+> The three endpoints default to disabled (`PYTHON_AUTH_ENABLED=true` is an isolated
+> development opt-in). .NET remains the production issuer. Existing lockouts are
+> honored and their fields preserved, but failed-attempt/lockout parity and admin
+> unlock remain #1186; production activation must wait for that work and retain
+> existing rate-limit protections. No frontend or gateway cutover occurs here.
+
 ## References
 
 - `CODEBASE_REVIEW.md` — full-stack review and issue inventory
