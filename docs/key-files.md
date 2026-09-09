@@ -251,6 +251,7 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/analysis/models.py` - Analysis Pydantic models
 - `processing-engine/app/storage/provider.py` - Storage abstraction ABC
 - `processing-engine/app/storage/local_storage.py` - Local filesystem storage implementation
+- `processing-engine/app/mast/path_security.py` - Shared resolved path containment and normalized MAST URI validation (#1094)
 - `processing-engine/app/storage/s3_storage.py` - S3-compatible storage implementation (boto3)
 - `processing-engine/app/storage/temp_cache.py` - LRU temp file cache for S3 downloads (2GB default)
 - `processing-engine/app/storage/factory.py` - Storage provider factory (singleton, supports `local` and `s3`)

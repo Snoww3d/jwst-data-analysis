@@ -48,6 +48,15 @@ class TestMastUriValidation:
             ("mast:JWST/product/../../../etc/passwd", "path traversal with .."),
             ("mast:../../../etc/passwd", "path traversal at start"),
             ("mast:JWST/../../../secret", "nested path traversal"),
+            ("mast:JWST/product/sub/../file.fits", "parent segment erased by normalization"),
+            ("mast:JWST/product/file..fits", "embedded double dots"),
+            ("mast:JWST/product/%2e%2e/secret", "encoded parent segment"),
+            ("mast:JWST/product/%252e%252e/secret", "double encoded parent segment"),
+            ("mast:JWST/product/%2Fetc%2fpasswd", "encoded separators"),
+            ("mast:JWST/product/./%2e%2e/secret", "dot segment with encoding"),
+            ("mast:JWST/product/file.fits\n", "trailing newline"),
+            ("mast:/JWST/product/file.fits", "absolute path"),
+            ("mast:.", "empty normalized path"),
             # Protocol smuggling
             ("mast:JWST/product/file.fits\nHost: evil.com", "newline injection"),
             ("mast:JWST/product/file.fits\r\nX-Injected: header", "CRLF injection"),
@@ -69,6 +78,7 @@ class TestMastUriValidation:
     def test_invalid_uri_rejected(self, uri: str, description: str):
         """Invalid or malicious URIs should be rejected."""
         assert MastService._is_valid_mast_uri(uri) is False, f"Should reject: {description}"
+        assert MastService._build_mast_download_url(uri) is None
 
 
 class TestObsIdValidation:
@@ -122,6 +132,14 @@ class TestObsIdValidation:
 
 class TestMastDownloadUrlBuilder:
     """Test cases for safe MAST download URL construction."""
+
+    @pytest.mark.parametrize("path", ["JWST/./product/file.fits", "JWST//product/file.fits"])
+    def test_download_url_uses_normalized_uri(self, path):
+        from urllib.parse import parse_qs, urlsplit
+
+        url = MastService._build_mast_download_url(f"mast:{path}")
+        assert url is not None
+        assert parse_qs(urlsplit(url).query) == {"uri": ["mast:JWST/product/file.fits"]}
 
     def test_valid_uri_builds_url(self):
         """Valid URI should produce a properly encoded URL."""
