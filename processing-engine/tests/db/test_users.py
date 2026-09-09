@@ -16,7 +16,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError
 
 from app.auth.routes import get_auth_service, router
-from app.auth.service import AuthService, TokenSettings, hash_refresh, utcnow
+from app.auth.service import (
+    INVALID_LOGIN,
+    INVALID_REFRESH,
+    AuthService,
+    TokenSettings,
+    hash_refresh,
+    utcnow,
+)
 from app.db.users import MongoUserRepository
 from tests.test_auth_port import PASSWORD, SECRET, assert_tokens, legacy_user
 
@@ -240,3 +247,33 @@ async def test_missing_optional_security_fields_match_dotnet_defaults(repo, coll
         del user[field]
     await collection.insert_one(user)
     assert await repo.save_login(user, {"LastLoginAt": utcnow()}, utcnow())
+
+
+async def test_missing_password_hash_conditional_writes_fail_closed(repo, collection):
+    user = legacy_user()
+    del user["PasswordHash"]
+    await collection.insert_one(user)
+    fields = {"RefreshToken": "must-not-save"}
+    assert not await repo.save_login(user, fields, utcnow())
+    assert not await repo.rotate(user, user["RefreshToken"], fields, utcnow())
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert stored["RefreshToken"] == user["RefreshToken"]
+    assert "PasswordHash" not in stored
+
+
+@pytest.mark.parametrize("path", ["login", "refresh"])
+async def test_missing_password_hash_returns_sanitized_rejection(client, collection, path):
+    user = legacy_user()
+    del user["PasswordHash"]
+    await collection.insert_one(user)
+    body = (
+        {"username": "legacy", "password": PASSWORD}
+        if path == "login"
+        else {"refreshToken": "legacy-refresh"}
+    )
+    response = await client.post(f"/api/auth/{path}", json=body)
+    assert response.status_code == 401
+    assert response.json() == {"error": INVALID_LOGIN if path == "login" else INVALID_REFRESH}
+    assert response.headers["Cache-Control"] == "no-store"
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert stored["RefreshToken"] == user["RefreshToken"]

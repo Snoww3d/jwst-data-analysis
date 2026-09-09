@@ -74,7 +74,7 @@ class MongoUserRepository:
         result = await self._col.update_one(
             {
                 "_id": user["_id"],
-                "PasswordHash": user["PasswordHash"],
+                "PasswordHash": user.get("PasswordHash", ""),
                 "Role": user.get("Role"),
                 **_eligible(now),
             },
@@ -88,7 +88,7 @@ class MongoUserRepository:
                 "_id": user["_id"],
                 "RefreshToken": user.get("RefreshToken"),
                 "Role": user.get("Role"),
-                "PasswordHash": user["PasswordHash"],
+                "PasswordHash": user.get("PasswordHash", ""),
                 "$and": [_eligible(now), _refresh_match(token_hash, now)],
             },
             {"$set": fields},

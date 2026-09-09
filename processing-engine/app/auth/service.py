@@ -115,12 +115,12 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
 def _user_info(user: dict) -> UserInfo:
     return UserInfo(
         id=str(user["_id"]),
-        username=user["Username"],
-        email=user["Email"],
+        username=user.get("Username", ""),
+        email=user.get("Email", ""),
         role=user.get("Role", "User"),
         display_name=user.get("DisplayName"),
         organization=user.get("Organization"),
-        created_at=_utc(user["CreatedAt"]),
+        created_at=_utc(user.get("CreatedAt", utcnow())),
         last_login_at=_utc(user["LastLoginAt"]) if user.get("LastLoginAt") else None,
     )
 
@@ -136,8 +136,8 @@ class AuthService:
         access = jwt.encode(
             {
                 "sub": str(user["_id"]),
-                "unique_name": user["Username"],
-                "email": user["Email"],
+                "unique_name": user.get("Username", ""),
+                "email": user.get("Email", ""),
                 _ROLE_CLAIMS[0]: user.get("Role", "User"),
                 "jti": str(uuid4()),
                 "iat": int(now.timestamp()),

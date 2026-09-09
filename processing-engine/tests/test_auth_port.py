@@ -413,6 +413,32 @@ async def test_refresh_contract_and_grace_rotation(client, repo, previous):
         assert 58 < (fields["PreviousRefreshTokenExpiresAt"] - utcnow()).total_seconds() <= 60
 
 
+async def test_refresh_missing_created_at_uses_dotnet_default(repo):
+    user = legacy_user()
+    del user["CreatedAt"]
+    repo.by_refresh.return_value = user
+    before = utcnow()
+    response = await AuthService(repo, TokenSettings(SECRET)).refresh("legacy-refresh")
+    assert before <= response.user.created_at <= utcnow()
+    assert_tokens(response.model_dump(mode="json", by_alias=True))
+    repo.rotate.assert_awaited_once()
+    assert "CreatedAt" not in repo.rotate.call_args.args[2]
+
+
+@pytest.mark.parametrize("field", ["CreatedAt", "Username", "Email"])
+async def test_refresh_missing_profile_fields_returns_safe_dto(client, repo, field):
+    user = legacy_user()
+    del user[field]
+    repo.by_refresh.return_value = user
+    response = await client.post("/api/auth/refresh", json={"refreshToken": "legacy-refresh"})
+    assert response.status_code == 200
+    body = response.json()
+    claims = assert_tokens(body)
+    assert body["user"]["username"] == claims["unique_name"] == user.get("Username", "")
+    assert body["user"]["email"] == claims["email"] == user.get("Email", "")
+    assert response.headers["Cache-Control"] == "no-store"
+
+
 @pytest.mark.parametrize(
     "kind",
     [
