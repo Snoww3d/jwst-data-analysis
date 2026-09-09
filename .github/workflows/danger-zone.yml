@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write # records revision receipts for explicit owner approval events
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -33,7 +33,7 @@ jobs:
       - name: Test the gate logic
         # The gate is security-relevant and has no other test runner. Fail the
         # check if its own unit tests fail, before trusting its verdict.
-        run: node --test .github/scripts/danger-zone.test.cjs
+        run: node --test .github/scripts/danger*.test.cjs
 
       - name: Evaluate danger zones
         env:

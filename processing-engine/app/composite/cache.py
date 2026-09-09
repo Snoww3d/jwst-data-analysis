@@ -106,9 +106,9 @@ class CompositeCache:
         """
         fingerprint = self._paths_fingerprint(channel_paths)
         with self._lock:
-            for key, (channels, ts, fp, original_shape) in list(self._store.items()):
-                if time.monotonic() - ts > self._ttl:
-                    continue
+            # Sweep the whole cache before a matching entry can return early.
+            self._evict_expired()
+            for key, (channels, _ts, fp, original_shape) in list(self._store.items()):
                 if fp == fingerprint:
                     self._store.move_to_end(key)
                     return channels, original_shape

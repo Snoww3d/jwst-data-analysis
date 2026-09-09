@@ -89,7 +89,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
         // Assert
         mockDataScanService.Verify(s => s.ScanAndImportAsync(), Times.Once);
         mockMongoDBService.Verify(m => m.GetViewableWithoutThumbnailIdsAsync(), Times.Once);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(missingThumbnailIds), Times.Once);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(missingThumbnailIds, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
         await RunAsync();
 
         // Assert
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
 
         // Assert
         mockMongoDBService.Verify(m => m.GetViewableWithoutThumbnailIdsAsync(), Times.Once);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(thumbnailIds), Times.Once);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(thumbnailIds, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
 
         // Phase 2 is skipped when phase 1 throws
         mockMongoDBService.Verify(m => m.GetViewableWithoutThumbnailIdsAsync(), Times.Never);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
 
         // Assert
         await act.Should().NotThrowAsync();
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
 
         // Assert — stoppingToken.IsCancellationRequested is true so phase 2 is skipped
         mockMongoDBService.Verify(m => m.GetViewableWithoutThumbnailIdsAsync(), Times.Never);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
 
         // Assert
         mockMongoDBService.Verify(m => m.GetViewableWithoutThumbnailIdsAsync(), Times.Once);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(thumbnailIds), Times.Once);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(thumbnailIds, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -289,7 +289,7 @@ public class StartupScanBackgroundServiceTests : IDisposable
         await RunAsync();
 
         // Assert — entire list passed as one batch
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(largeBatch), Times.Once);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(largeBatch, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

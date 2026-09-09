@@ -291,7 +291,7 @@ namespace JwstDataAnalysis.API.Services
             // Enqueue thumbnail generation for newly imported files
             if (importedIds.Count > 0)
             {
-                thumbnailQueue.EnqueueBatch(importedIds);
+                await thumbnailQueue.EnqueueBatchAsync(importedIds);
 
                 // Enqueue semantic embedding for newly imported files
                 embeddingQueue.TryEnqueue(new EmbeddingJobItem

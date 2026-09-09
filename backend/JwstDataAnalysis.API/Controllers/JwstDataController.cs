@@ -2172,7 +2172,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         /// <summary>
         /// Generate thumbnails for all viewable records that don't have one yet.
-        /// Runs in the background and returns immediately with a count of queued items.
+        /// Runs in the background and returns a count after waiting for queue space.
         /// </summary>
         [HttpPost("generate-thumbnails")]
         [Authorize(Policy = "AdminOnly")]
@@ -2186,7 +2186,7 @@ namespace JwstDataAnalysis.API.Controllers
                     return Ok(new { queued = 0, message = "All viewable records already have thumbnails" });
                 }
 
-                thumbnailQueue.EnqueueBatch(ids);
+                await thumbnailQueue.EnqueueBatchAsync(ids);
 
                 return Ok(new { queued = ids.Count });
             }

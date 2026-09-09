@@ -110,7 +110,7 @@ public class DataScanServiceTests
             Times.Once);
 
         // Thumbnail queue should have been poked
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Once);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -215,7 +215,7 @@ public class DataScanServiceTests
 
         // No creates, no thumbnail queue
         mockMongo.Verify(m => m.CreateAsync(It.IsAny<JwstDataModel>()), Times.Never);
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -628,7 +628,7 @@ public class DataScanServiceTests
             .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
             .ReturnsAsync(new MastSearchResponse { Results = [] });
         mockThumbnailQueue
-            .Setup(q => q.EnqueueBatch(It.IsAny<List<string>>()));
+            .Setup(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()));
 
         var sut = CreateSut();
 
@@ -699,7 +699,7 @@ public class DataScanServiceTests
         await sut.ScanAndImportAsync();
 
         // Assert — no new IDs means no queue calls
-        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatchAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

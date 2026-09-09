@@ -20,7 +20,7 @@ flowchart TB
             CQ["Composite Queue\n(capacity: 10)"]
             MQ["Mosaic Queue\n(capacity: 10)"]
             EQ["Embedding Queue\n(capacity: 10)"]
-            TQ["Thumbnail Queue\n(unbounded)"]
+            TQ["Thumbnail Queue\n(bounded: 50)"]
         end
         Hub["SignalR Hub\n(Group-based push)"]
         JT["JobTracker\n(MongoDB + in-memory cache)"]
@@ -66,9 +66,14 @@ The backend uses .NET `BoundedChannel<T>` for async job queues with dedicated `B
 | Composite | 10 | `CompositeBackgroundService` | Sequential (1 reader) | N-channel composite exports |
 | Mosaic | 10 | `MosaicBackgroundService` | Sequential (1 reader) | Mosaic exports and saves |
 | Embedding | 10 | `EmbeddingBackgroundService` | Sequential (1 reader) | Semantic search indexing |
-| Thumbnail | Unbounded | `ThumbnailBackgroundService` | Sequential (1 reader) | Thumbnail generation |
+| Thumbnail | 50 batches (wait when full) | `ThumbnailBackgroundService` | Sequential (1 reader) | Thumbnail generation |
 
 ### Queue Behavior
+
+Thumbnail producers await space when 50 batches are buffered. Warning event 8005
+reports occupancy when an enqueue sees at least 40 buffered batches. PendingCount
+includes waiting, buffered, and processing batches, so it may exceed 50. Capacity
+limits batch count, not the number of IDs in each batch.
 
 ```
 API Request (POST /api/composite/export-nchannel)
