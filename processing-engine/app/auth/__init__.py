@@ -1,5 +1,5 @@
-"""Authentication package — JWT issue/validate, register/login/refresh.
+"""Python authentication foundation (ADR 0001 Phase 1).
 
-Scaffolding for the Python single-backend migration. Logic lands in Phase 1;
-see docs/architecture/adr/0001-collapse-to-python-single-backend.md.
+Token validation is always available. Register/login/refresh require explicit
+PYTHON_AUTH_ENABLED=true for development pending #1186 lockout parity.
 """
