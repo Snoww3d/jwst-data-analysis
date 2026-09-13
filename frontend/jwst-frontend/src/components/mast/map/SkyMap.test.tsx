@@ -208,7 +208,9 @@ describe('SkyMap', () => {
     loadAladinMock.mockResolvedValue(stub.A);
     render(<SkyMap />);
     const select = await screen.findByLabelText('Background survey');
-    expect(stub.aladin.setBaseImageLayer).toHaveBeenCalledTimes(1);
+    // The base layer is applied in the async Aladin init effect, which may not
+    // have run yet when the select first renders.
+    await waitFor(() => expect(stub.aladin.setBaseImageLayer).toHaveBeenCalledTimes(1));
     act(() => {
       (select as HTMLSelectElement).value = 'P/2MASS/color';
       select.dispatchEvent(new Event('change', { bubbles: true }));
