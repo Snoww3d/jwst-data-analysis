@@ -92,6 +92,9 @@ class TestCeMode:
             "/mast/search/target",  # unprefixed mast router (proxy service only)
             "/preview/{data_id}",  # render router mounts non-CE only
             "/thumbnail",
+            "/api/auth/register",
+            "/api/auth/login",
+            "/api/auth/refresh",
             "/api/jobs",  # job store is full-mode-only (#1709 PR 2)
             "/api/calibration/recipes",  # calibration is full-mode-only (#1709 PR 3)
         ):
@@ -142,3 +145,14 @@ class TestNonCeMode:
         for v in ("0", "false", "", "no"):
             app = load_app(v)
             assert "/composite/generate-nchannel" in paths(app), f"CE_MODE={v!r} must be off"
+
+
+def test_python_auth_opt_in_never_mounts_in_ce(monkeypatch):
+    monkeypatch.setenv("PYTHON_AUTH_ENABLED", "true")
+    app = load_app("true")
+    assert not any(path.startswith("/api/auth/") for path in paths(app))
+
+
+def test_python_auth_routes_mount_in_full_mode():
+    app = load_app(None)
+    assert {"/api/auth/register", "/api/auth/login", "/api/auth/refresh"} <= paths(app)

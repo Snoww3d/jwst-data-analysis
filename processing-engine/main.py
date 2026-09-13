@@ -128,9 +128,8 @@ else:
     app.include_router(semantic_router)
     app.include_router(render_router)  # thumbnail/preview/histogram/pixeldata/cubeinfo
 
-    # Single-backend migration scaffolding (ADR 0001). auth/jobs are empty
-    # until their phases land; library now carries the CE read endpoints,
-    # mounted in dev too so they can be exercised against the full stack.
+    # Single-backend API routes (ADR 0001): opt-in auth, library reads and jobs.
+    # Mount them in full mode so they can be exercised against the full stack.
     app.include_router(auth_router)
     app.include_router(library_router)
     app.include_router(jobs_router)
