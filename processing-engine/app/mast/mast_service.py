@@ -22,6 +22,7 @@ from astroquery.mast import Observations
 
 from app.config import int_env
 from app.exceptions import MASTServiceError
+from app.mast.path_security import validate_mast_uri
 
 
 logger = logging.getLogger(__name__)
@@ -126,10 +127,6 @@ class MastService:
     # response so the client can say so. Tunable via MAST_PAGE_SIZE. (#1221)
     DEFAULT_PAGE_SIZE = int_env("MAST_PAGE_SIZE", 500)
 
-    # Valid MAST data URI pattern: mast:{collection}/product/{filename}
-    # Only allows alphanumeric, underscores, hyphens, dots, forward slashes, and colons
-    MAST_URI_PATTERN = re.compile(r"^mast:[A-Za-z0-9_\-./]+$")
-
     # Valid obs_id pattern: alphanumeric, underscores, hyphens, dots only (no path separators)
     OBS_ID_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+$")
 
@@ -202,19 +199,7 @@ class MastService:
         Returns:
             True if valid, False otherwise
         """
-        if not uri:
-            return False
-
-        # Must start with mast: prefix
-        if not uri.startswith("mast:"):
-            return False
-
-        # Must match the allowed pattern (no query strings, fragments, or special chars)
-        if not MastService.MAST_URI_PATTERN.match(uri):
-            return False
-
-        # Additional checks: no path traversal
-        return ".." not in uri
+        return validate_mast_uri(uri) is not None
 
     @staticmethod
     def _build_mast_download_url(data_uri: str) -> str | None:
@@ -229,12 +214,13 @@ class MastService:
         Returns:
             The full download URL, or None if the URI is invalid
         """
-        if not MastService._is_valid_mast_uri(data_uri):
+        validated_uri = validate_mast_uri(data_uri)
+        if validated_uri is None:
             logger.warning(f"SSRF attempt blocked: invalid MAST data URI format: {data_uri[:100]}")
             return None
 
         # URL-encode the URI parameter (safe='' encodes everything except alphanumerics)
-        encoded_uri = quote(data_uri, safe="")
+        encoded_uri = quote(validated_uri, safe="")
         return f"{MastService.MAST_DOWNLOAD_BASE}?uri={encoded_uri}"
 
     @staticmethod
