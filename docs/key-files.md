@@ -207,10 +207,10 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/main.py` - FastAPI application entry point (image processing: composites, mosaics, analysis)
 - `processing-engine/main_mast.py` - FastAPI entry point for MAST proxy service (search, download)
 - `processing-engine/app/exceptions.py` - Custom exception hierarchy and error handler middleware
-- `processing-engine/app/auth/routes.py` - Opt-in register/login/refresh endpoints; disabled by default pending #1186 (#1991)
+- `processing-engine/app/auth/routes.py` - Opt-in register/login/refresh plus Admin lockout-status/unlock endpoints; disabled by default until the ADR 0001 cutover (#1991, #1186)
 - `processing-engine/app/auth/models.py` - Validated auth requests and explicit camelCase token/user DTOs (#1991)
-- `processing-engine/app/auth/service.py` - Existing bcrypt password verification, JWT issuance, hashed refresh rotation (#1991)
-- `processing-engine/app/db/users.py` - Users repository Protocol and Mongo adapter; existing indexes, targeted writes and conditional refresh rotation (#1991)
+- `processing-engine/app/auth/service.py` - Existing bcrypt password verification, JWT issuance, hashed refresh rotation (#1991), .NET-compatible failed-login lockout and admin unlock (#1186)
+- `processing-engine/app/db/users.py` - Users repository Protocol and Mongo adapter; existing indexes, targeted writes and conditional refresh rotation (#1991), atomic failed-login counter and lockout reset (#1186)
 - `processing-engine/app/auth/deps.py` - JWT validation dependency (validates .NET-issued HS256 tokens; require_user/optional_user/require_role) (#1709)
 - `processing-engine/app/jobs/store.py` - Mongo-persisted job store (first write-capable repo; atomic $set/$push); `runner.py` - fire-and-forget executor; `routes.py` - /api/jobs status/cancel (#1709)
 - `processing-engine/app/calibration/models.py` - CalibrationRecipe schema (scalar-only step_overrides); `validation.py`, `store.py`, `seeds/*.json` (curated NIRCam/NIRISS/MIRI recipes) (#1709)

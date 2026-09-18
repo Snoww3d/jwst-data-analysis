@@ -1,6 +1,7 @@
 """AuthModels/AuthService/JwtTokenService contract and failure cases (#1991)."""
 
 import base64
+import logging
 from copy import deepcopy
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
@@ -13,12 +14,12 @@ from httpx import ASGITransport, AsyncClient
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 
 from app.auth.deps import require_role, require_user
-from app.auth.models import LoginRequest
 from app.auth.routes import get_auth_service, router
 from app.auth.service import (
     DUPLICATE,
     INVALID_LOGIN,
     INVALID_REFRESH,
+    USER_NOT_FOUND,
     AuthService,
     TokenSettings,
     hash_password,
@@ -48,6 +49,7 @@ USER_KEYS = {
     "lastLoginAt",
 }
 TOKEN_KEYS = {"accessToken", "refreshToken", "expiresAt", "tokenType", "user"}
+LOCKOUT_KEYS = {"userId", "username", "isLocked", "failedLoginAttempts", "lockedUntil"}
 
 
 def legacy_user(**fields):
@@ -87,7 +89,27 @@ def repo():
     result.by_refresh.return_value = None
     result.save_login.return_value = True
     result.rotate.return_value = True
+    result.by_id.return_value = None
+    result.record_failed_login.return_value = 1
+    result.reset_lockout.return_value = True
     return result
+
+
+def bearer(role="Admin", sub="admin-id"):
+    now = utcnow()
+    token = jwt.encode(
+        {
+            "sub": sub,
+            ROLE_URI: role,
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
+            "iss": "JwstDataAnalysis",
+            "aud": "JwstDataAnalysisClient",
+        },
+        SECRET,
+        algorithm="HS256",
+    )
+    return {"Authorization": "Bearer " + token}
 
 
 @pytest.fixture
@@ -191,7 +213,10 @@ async def test_login_legacy_contract_and_dependencies(client, repo):
         "PreviousRefreshToken",
         "PreviousRefreshTokenExpiresAt",
         "LastLoginAt",
+        "FailedLoginAttempts",
+        "LockedUntil",
     }
+    assert fields["FailedLoginAttempts"] == 0 and fields["LockedUntil"] is None
     headers = {"Authorization": "Bearer " + body["accessToken"]}
     assert (await client.get("/protected", headers=headers)).json() == {
         "id": str(user["_id"]),
@@ -230,6 +255,12 @@ async def test_generic_login_failures(client, repo, kind):
     assert response.json() == {"error": INVALID_LOGIN}
     if kind != "changed":
         repo.save_login.assert_not_awaited()
+    if kind in ("wrong", "malformed"):
+        # A corrupt stored hash fails verification like a wrong password.
+        repo.record_failed_login.assert_awaited_once()
+    else:
+        repo.record_failed_login.assert_not_awaited()
+    repo.reset_lockout.assert_not_awaited()
 
 
 async def test_missing_user_does_bcrypt_work(client, repo):
@@ -358,6 +389,9 @@ async def test_disabled_by_default_even_before_body_parse(client, app, monkeypat
         ("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", "oops"),
         ("JWT_REFRESH_TOKEN_EXPIRATION_DAYS", "0"),
         ("JWT_REFRESH_TOKEN_GRACE_WINDOW_SECONDS", "-1"),
+        ("JWT_MAX_FAILED_LOGIN_ATTEMPTS", "0"),
+        ("JWT_ACCOUNT_LOCKOUT_MINUTES", "0"),
+        ("JWT_ACCOUNT_LOCKOUT_MINUTES", "oops"),
     ],
 )
 async def test_bad_config_fails_before_writing(client, repo, monkeypatch, key, value):
@@ -495,22 +529,218 @@ async def test_rotation_loser_retries_using_grace(client, repo):
     assert repo.rotate.call_args.args[2]["PreviousRefreshToken"] is None
 
 
-async def test_login_keeps_expired_lockout_and_counter_for_1186(repo):
-    user = legacy_user(LockedUntil=utcnow() - timedelta(minutes=1))
+async def test_wrong_password_counts_and_locks_at_threshold(client, repo, caplog):
+    user = legacy_user(FailedLoginAttempts=4)
     repo.by_username.return_value = user
-    await AuthService(repo, TokenSettings(SECRET)).login(
-        LoginRequest(username="legacy", password=PASSWORD)
+    repo.record_failed_login.return_value = 5
+    before = utcnow()
+    with caplog.at_level(logging.WARNING, logger="app.auth.service"):
+        response = await client.post(
+            "/api/auth/login", json={"username": "legacy", "password": "WrongPass1!"}
+        )
+    assert response.status_code == 401
+    assert response.json() == {"error": INVALID_LOGIN}
+    counted, max_attempts, locked_until = repo.record_failed_login.call_args.args
+    assert counted["_id"] == user["_id"] and max_attempts == 5
+    assert before + timedelta(minutes=15) <= locked_until <= utcnow() + timedelta(minutes=15)
+    assert f"Account {user['_id']} locked after 5 failed logins" in caplog.text
+    repo.save_login.assert_not_awaited()
+
+
+@pytest.mark.parametrize("password", [PASSWORD, "WrongPass1!"])
+async def test_active_lockout_rejects_without_counting(client, repo, password):
+    repo.by_username.return_value = legacy_user(
+        FailedLoginAttempts=5, LockedUntil=utcnow() + timedelta(minutes=10)
     )
-    assert user["FailedLoginAttempts"] == 3
-    assert "LockedUntil" not in repo.save_login.call_args.args[1]
+    response = await client.post(
+        "/api/auth/login", json={"username": "legacy", "password": password}
+    )
+    assert response.status_code == 401
+    assert response.json() == {"error": INVALID_LOGIN}
+    repo.record_failed_login.assert_not_awaited()
+    repo.reset_lockout.assert_not_awaited()
+    repo.save_login.assert_not_awaited()
+
+
+async def test_inactive_wrong_password_is_not_counted(client, repo):
+    repo.by_username.return_value = legacy_user(IsActive=False)
+    response = await client.post(
+        "/api/auth/login", json={"username": "legacy", "password": "WrongPass1!"}
+    )
+    assert response.status_code == 401
+    repo.record_failed_login.assert_not_awaited()
+
+
+async def test_expired_lockout_restarts_counter_then_success_resets(client, repo):
+    user = legacy_user(FailedLoginAttempts=5, LockedUntil=utcnow() - timedelta(minutes=1))
+    repo.by_username.return_value = user
+    response = await client.post(
+        "/api/auth/login", json={"username": "legacy", "password": PASSWORD}
+    )
+    assert response.status_code == 200
+    repo.reset_lockout.assert_awaited_once_with(user["_id"])
+    repo.record_failed_login.assert_not_awaited()
+    # The counter is already zero after the expiry reset; no second reset field.
+    assert "FailedLoginAttempts" not in repo.save_login.call_args.args[1]
+
+
+async def test_expired_lockout_then_wrong_password_counts_from_zero(client, repo):
+    user = legacy_user(FailedLoginAttempts=5, LockedUntil=utcnow() - timedelta(minutes=1))
+    repo.by_username.return_value = user
+    response = await client.post(
+        "/api/auth/login", json={"username": "legacy", "password": "WrongPass1!"}
+    )
+    assert response.status_code == 401
+    repo.reset_lockout.assert_awaited_once_with(user["_id"])
+    assert repo.record_failed_login.call_args.args[0]["FailedLoginAttempts"] == 0
+
+
+async def test_success_without_failures_leaves_counter_fields_alone(client, repo):
+    repo.by_username.return_value = legacy_user(FailedLoginAttempts=0)
+    response = await client.post(
+        "/api/auth/login", json={"username": "legacy", "password": PASSWORD}
+    )
+    assert response.status_code == 200
+    fields = repo.save_login.call_args.args[1]
+    assert "FailedLoginAttempts" not in fields and "LockedUntil" not in fields
+    repo.reset_lockout.assert_not_awaited()
+
+
+ADMIN_ROUTES = [
+    ("get", "/api/auth/admin/lockout-status/"),
+    ("post", "/api/auth/admin/unlock/"),
+]
+
+
+@pytest.mark.parametrize(("method", "path"), ADMIN_ROUTES)
+async def test_admin_lockout_routes_reject_non_admin(client, repo, method, path):
+    user_id = str(ObjectId())
+    response = await client.request(method, path + user_id, headers=bearer("User"))
+    assert response.status_code == 403
+    assert (await client.request(method, path + user_id)).status_code == 401
+    repo.by_id.assert_not_awaited()
+    repo.reset_lockout.assert_not_awaited()
+
+
+@pytest.mark.parametrize(("method", "path"), ADMIN_ROUTES)
+@pytest.mark.parametrize("user_id", [str(ObjectId()), "not-an-object-id"])
+async def test_admin_lockout_routes_unknown_user_404(client, repo, method, path, user_id):
+    response = await client.request(method, path + user_id, headers=bearer())
+    assert response.status_code == 404
+    assert response.json() == {"error": USER_NOT_FOUND}
+    assert response.headers["Cache-Control"] == "no-store"
+    repo.by_id.assert_awaited_once_with(user_id)
+    repo.reset_lockout.assert_not_awaited()
+
+
+async def test_lockout_status_is_allowlisted(client, repo):
+    locked_until = (utcnow() + timedelta(minutes=10)).replace(tzinfo=None, microsecond=0)
+    user = legacy_user(FailedLoginAttempts=5, LockedUntil=locked_until)
+    repo.by_id.return_value = user
+    response = await client.get(f"/api/auth/admin/lockout-status/{user['_id']}", headers=bearer())
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == LOCKOUT_KEYS
+    assert body["userId"] == str(user["_id"])
+    assert body["username"] == "legacy"
+    assert body["isLocked"] is True
+    assert body["failedLoginAttempts"] == 5
+    assert body["lockedUntil"].endswith("Z")
+    for secret in (LEGACY_HASH, "must-never-leak", user["RefreshToken"]):
+        assert secret not in response.text
+    repo.reset_lockout.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"LockedUntil": utcnow() - timedelta(minutes=1), "FailedLoginAttempts": 5},
+        {"LockedUntil": None, "FailedLoginAttempts": 2},
+    ],
+)
+async def test_lockout_status_unlocked_states(client, repo, fields):
+    repo.by_id.return_value = legacy_user(**fields)
+    body = (
+        await client.get(f"/api/auth/admin/lockout-status/{ObjectId()}", headers=bearer())
+    ).json()
+    assert body["isLocked"] is False
+    assert body["failedLoginAttempts"] == fields["FailedLoginAttempts"]
+
+
+async def test_lockout_status_missing_fields_default_unlocked(client, repo):
+    user = legacy_user()
+    del user["FailedLoginAttempts"], user["LockedUntil"]
+    repo.by_id.return_value = user
+    body = (
+        await client.get(f"/api/auth/admin/lockout-status/{user['_id']}", headers=bearer())
+    ).json()
+    assert body == {
+        "userId": str(user["_id"]),
+        "username": "legacy",
+        "isLocked": False,
+        "failedLoginAttempts": 0,
+        "lockedUntil": None,
+    }
+
+
+@pytest.mark.parametrize("locked", [True, False])
+async def test_unlock_resets_and_logs_acting_admin(client, repo, caplog, locked):
+    user = legacy_user(
+        FailedLoginAttempts=5 if locked else 0,
+        LockedUntil=utcnow() + timedelta(minutes=10) if locked else None,
+    )
+    repo.by_id.return_value = user
+    with caplog.at_level(logging.INFO, logger="app.auth.service"):
+        response = await client.post(
+            f"/api/auth/admin/unlock/{user['_id']}", headers=bearer(sub="acting-admin")
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == LOCKOUT_KEYS
+    assert (body["isLocked"], body["failedLoginAttempts"], body["lockedUntil"]) == (
+        False,
+        0,
+        None,
+    )
+    assert "must-never-leak" not in response.text
+    repo.reset_lockout.assert_awaited_once_with(user["_id"])
+    assert f"Admin acting-admin unlocked account {user['_id']}" in caplog.text
+
+
+async def test_unlock_user_deleted_mid_request_404(client, repo):
+    repo.by_id.return_value = legacy_user()
+    repo.reset_lockout.return_value = False
+    response = await client.post(f"/api/auth/admin/unlock/{ObjectId()}", headers=bearer())
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize(("method", "path"), ADMIN_ROUTES)
+async def test_admin_lockout_routes_database_failure_sanitized(client, repo, method, path):
+    repo.by_id.side_effect = ServerSelectionTimeoutError("mongodb://private-password@internal")
+    response = await client.request(method, path + str(ObjectId()), headers=bearer())
+    assert response.status_code == 503
+    assert response.json() == {"error": "Authentication service unavailable"}
+
+
+@pytest.mark.parametrize(("method", "path"), ADMIN_ROUTES)
+async def test_admin_lockout_routes_disabled_by_default(client, app, monkeypatch, method, path):
+    monkeypatch.delenv("PYTHON_AUTH_ENABLED")
+    dependency = AsyncMock(side_effect=AssertionError("must not touch DB"))
+    app.dependency_overrides[get_auth_service] = dependency
+    response = await client.request(method, path + str(ObjectId()), headers=bearer())
+    assert response.status_code == 503
+    dependency.assert_not_called()
 
 
 def test_setting_overrides(env, monkeypatch):
     monkeypatch.setenv("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", "15")
     monkeypatch.setenv("JWT_REFRESH_TOKEN_EXPIRATION_DAYS", "2")
     monkeypatch.setenv("JWT_REFRESH_TOKEN_GRACE_WINDOW_SECONDS", "0")
+    monkeypatch.setenv("JWT_MAX_FAILED_LOGIN_ATTEMPTS", "3")
+    monkeypatch.setenv("JWT_ACCOUNT_LOCKOUT_MINUTES", "30")
     settings = TokenSettings.from_env()
     assert (settings.access_minutes, settings.refresh_days, settings.grace_seconds) == (15, 2, 0)
+    assert (settings.max_failed_attempts, settings.lockout_minutes) == (3, 30)
 
 
 async def test_missing_mongo_configuration(client, app, monkeypatch):
