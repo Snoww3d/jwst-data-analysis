@@ -32,6 +32,7 @@
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const approval = require("./danger-approval.cjs");
+const status = require("./danger-status.cjs");
 
 const CONFIG_PATH = ".claude/sdlc.json";
 const APPROVAL_LABEL = "danger-approved";
@@ -86,10 +87,12 @@ function specReference(body, config) {
 }
 
 /**
- * Pure decision. Returns `{ gated, hits, errors }`:
- *   gated  - a danger-zone path was touched
- *   hits   - [{file, pattern}] of the touched paths
- *   errors - reasons the gate is held; empty means released
+ * Pure decision. Returns `{ gated, hits, errors, problems }`:
+ *   gated    - a danger-zone path was touched
+ *   hits     - [{file, pattern}] of the touched paths
+ *   errors   - reasons the gate is held; empty means released
+ *   problems - the same reasons as `{code, message, reason?}` for the status
+ *              comment; `errors` is always `problems.map(p => p.message)`
  */
 function evaluate({
   changedFiles,
@@ -117,9 +120,10 @@ function evaluate({
       }
     }
   }
-  if (hits.length === 0) return { gated: false, hits, errors: [] };
+  if (hits.length === 0)
+    return { gated: false, hits, errors: [], problems: [] };
 
-  const errors = [];
+  const problems = [];
 
   // --- Human signal ---
   // A bot approving its own work is not human oversight.
@@ -133,9 +137,11 @@ function evaluate({
       base,
     })
   ) {
-    errors.push(
-      "This PR changes a danger-zone path and has no human signal for this head/base. Approve this revision in personal-os, or remove and reapply `danger-approved` as the owner in GitHub (including mobile). New commits or a changed base need fresh approval.",
-    );
+    problems.push({
+      code: "approval",
+      message:
+        "This PR changes a danger-zone path and has no human signal for this head/base. Approve this revision in personal-os, or apply `danger-approved` as the owner in GitHub (including mobile). New commits or a changed base need fresh approval: the gate removes a stale label so you can just re-apply it. If the label is on and this still fails, remove and re-apply it.",
+    });
   }
 
   // --- Spec signal, when configured ---
@@ -152,26 +158,34 @@ function evaluate({
     const smallDiff = changedLines < SMALL_DIFF_LINES;
     if (!hasSpec && !hasSpecRef && !(hasMarker && smallDiff)) {
       let why;
+      let reason;
       if (specRef) {
         why = ` The body names \`Spec: ${specRef}\` but that file does not exist at the PR head.`;
+        reason = why.trim();
       } else if (SPEC_REF_RE.test(body)) {
         why = ` The body's \`Spec:\` line is malformed: it must name a \`.md\` under \`${specDir}\`.`;
+        reason = why.trim();
       } else if (hasMarker && !smallDiff) {
         why = ` The \`SDLC-Exception: plan-in-pr-body\` marker is present but the PR changes ${changedLines} lines (limit ${SMALL_DIFF_LINES}).`;
+        reason = why.trim();
       } else {
         why =
           ` If the spec is already on main, add a \`Spec: ${specDir}<name>.md\` line to the PR body.` +
           ` For a change under ${SMALL_DIFF_LINES} lines, a \`SDLC-Exception: plan-in-pr-body\` line is accepted instead.`;
       }
-      errors.push(
-        `A danger-zone change needs a spec. Add one under \`${specDir}\` ` +
+      problems.push({
+        code: "spec",
+        reason,
+        message:
+          `A danger-zone change needs a spec. Add one under \`${specDir}\` ` +
           "describing the approach, the alternatives rejected, and the failure modes." +
           why,
-      );
+      });
     }
   }
 
-  return { gated: true, hits, errors };
+  const errors = problems.map((p) => p.message);
+  return { gated: true, hits, errors, problems };
 }
 
 module.exports = {
@@ -197,6 +211,161 @@ function ghJson(path, paginate = false) {
   if (paginate) args.push("--paginate", "--slurp");
   const out = JSON.parse(execFileSync("gh", args, { encoding: "utf8" }));
   return paginate ? out.flat() : out;
+}
+
+/** A non-GET `gh api` call with an optional JSON body. */
+function ghWrite(method, path, payload) {
+  const args = ["api", "--method", method, path];
+  if (payload) args.push("--input", "-");
+  const out = execFileSync("gh", args, {
+    input: payload ? JSON.stringify(payload) : undefined,
+    encoding: "utf8",
+    timeout: 30_000,
+  });
+  return out.trim() ? JSON.parse(out) : null;
+}
+
+// Issue events carry the actor of each label change; the PR's current label
+// list does not say who applied it.
+function readLabelEvents(REPO, PR_NUMBER) {
+  return ghJson(`repos/${REPO}/issues/${PR_NUMBER}/events`, true)
+    .filter((e) => e.event === "labeled" || e.event === "unlabeled")
+    .map((e) => ({
+      id: e.id,
+      created_at: e.created_at,
+      event: e.event,
+      label: e.label?.name,
+      actor: e.actor?.login,
+    }));
+}
+
+const readComments = (REPO, PR_NUMBER) =>
+  ghJson(`repos/${REPO}/issues/${PR_NUMBER}/comments?per_page=100`, true);
+
+const hasLabel = (pr) =>
+  (pr.labels ?? []).some((l) => l?.name === APPROVAL_LABEL);
+
+/**
+ * Owner-facing report: remove a provably stale `danger-approved` label and
+ * create or update the one status comment. Runs after the verdict and cannot
+ * change it: every failure is caught and logged here.
+ */
+function reportStatus(ctx) {
+  const { REPO, PR_NUMBER, HEAD_SHA, BASE_SHA, verdict } = ctx;
+  const skip = status.writeSkipReason({
+    repo: REPO,
+    headRepo: process.env.HEAD_REPO,
+    actor: process.env.ACTOR,
+  });
+  const stillCurrent = () => {
+    const live = ghJson(`repos/${REPO}/pulls/${PR_NUMBER}`);
+    return live.head?.sha === HEAD_SHA && live.base?.sha === BASE_SHA
+      ? live
+      : null;
+  };
+
+  const stale = status.staleLabel({
+    labelPresent: ctx.labelPresent,
+    comments: ctx.comments,
+    labelEvents: ctx.labelEvents,
+    reviews: ctx.reviews,
+    ownerLogin: ctx.ownerLogin,
+    head: HEAD_SHA,
+    base: BASE_SHA,
+  });
+  let removed = false;
+  if (stale && skip) {
+    console.log(`Stale \`${APPROVAL_LABEL}\` label left in place: ${skip}.`);
+  } else if (stale) {
+    try {
+      // Re-read everything right before deleting, so an approval that landed
+      // after the first read is never revoked by this removal.
+      const live = stillCurrent();
+      const again =
+        live &&
+        status.staleLabel({
+          labelPresent: hasLabel(live),
+          comments: readComments(REPO, PR_NUMBER),
+          labelEvents: readLabelEvents(REPO, PR_NUMBER),
+          reviews: ctx.reviews,
+          ownerLogin: ctx.ownerLogin,
+          head: HEAD_SHA,
+          base: BASE_SHA,
+        });
+      if (again) {
+        ghWrite(
+          "DELETE",
+          `repos/${REPO}/issues/${PR_NUMBER}/labels/${APPROVAL_LABEL}`,
+        );
+        removed = true;
+        console.log(
+          `Removed stale \`${APPROVAL_LABEL}\` label: it approved ${stale.head.slice(0, 7)}, not ${HEAD_SHA.slice(0, 7)}.`,
+        );
+      } else {
+        console.log(
+          `\`${APPROVAL_LABEL}\` label no longer provably stale on re-read; left in place.`,
+        );
+      }
+    } catch (err) {
+      console.log(
+        `Could not remove stale \`${APPROVAL_LABEL}\` label: ${err.message}`,
+      );
+    }
+  }
+
+  let commitsSince = null;
+  if (stale && stale.head !== HEAD_SHA) {
+    try {
+      commitsSince = Number(
+        execFileSync(
+          "git",
+          ["rev-list", "--count", `${stale.head}..${HEAD_SHA}`],
+          {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+          },
+        ).trim(),
+      );
+    } catch {
+      commitsSince = null; // old head not in the clone, e.g. after a force-push
+    }
+  }
+
+  const body = status.render({
+    hits: verdict.hits,
+    problems: verdict.problems,
+    head: HEAD_SHA,
+    stale,
+    removed,
+    commitsSince,
+    labelPresent: ctx.labelPresent && !removed,
+    specDir: ctx.config.artifacts?.spec,
+    smallDiffLines: SMALL_DIFF_LINES,
+    changedLines: ctx.changedLines,
+  });
+  if (skip) {
+    console.log(`Status comment skipped: ${skip}.`);
+    return;
+  }
+  try {
+    // An older run must not overwrite the status of a newer revision.
+    if (!stillCurrent()) {
+      console.log(
+        "Status comment skipped: the PR moved on; a newer run reports it.",
+      );
+      return;
+    }
+    const plan = status.upsertAction(ctx.comments, body);
+    if (plan.action === "create")
+      ghWrite("POST", `repos/${REPO}/issues/${PR_NUMBER}/comments`, { body });
+    else if (plan.action === "update")
+      ghWrite("PATCH", `repos/${REPO}/issues/comments/${plan.id}`, { body });
+    console.log(
+      `Status comment: ${plan.action === "none" ? "unchanged" : plan.action + "d"}.`,
+    );
+  } catch (err) {
+    console.log(`Could not update the status comment: ${err.message}`);
+  }
 }
 
 function main() {
@@ -263,17 +432,7 @@ function main() {
         type: r.user?.type,
       }),
     );
-    // Issue events carry the actor of each label change; the PR's current
-    // label list does not say who applied it.
-    labelEvents = ghJson(`repos/${REPO}/issues/${PR_NUMBER}/events`, true)
-      .filter((e) => e.event === "labeled" || e.event === "unlabeled")
-      .map((e) => ({
-        id: e.id,
-        created_at: e.created_at,
-        event: e.event,
-        label: e.label?.name,
-        actor: e.actor?.login,
-      }));
+    labelEvents = readLabelEvents(REPO, PR_NUMBER);
     pr = ghJson(`repos/${REPO}/pulls/${PR_NUMBER}`);
     ownerLogin = ghJson(`repos/${REPO}`).owner.login;
     if (
@@ -283,10 +442,7 @@ function main() {
       pr.draft
     )
       throw new Error("PR revision changed; evaluate the current revision");
-    comments = ghJson(
-      `repos/${REPO}/issues/${PR_NUMBER}/comments?per_page=100`,
-      true,
-    );
+    comments = readComments(REPO, PR_NUMBER);
     const event = process.env.GITHUB_EVENT_PATH
       ? JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"))
       : {};
@@ -333,7 +489,7 @@ function main() {
     ]);
   }
 
-  const { errors } = evaluate({
+  const verdict = evaluate({
     changedFiles,
     reviews,
     labelEvents,
@@ -346,6 +502,28 @@ function main() {
     config,
     ownerLogin,
   });
+  const { errors } = verdict;
+
+  // The verdict is fixed above. Reporting it can only log on failure.
+  try {
+    reportStatus({
+      REPO,
+      PR_NUMBER,
+      HEAD_SHA,
+      BASE_SHA,
+      verdict,
+      config,
+      comments,
+      labelEvents,
+      reviews,
+      ownerLogin,
+      labelPresent: hasLabel(pr),
+      changedLines: (pr.additions ?? 0) + (pr.deletions ?? 0),
+    });
+  } catch (err) {
+    console.log(`Status report failed: ${err.message}`);
+  }
+
   if (errors.length > 0) fail(errors);
 
   console.log("Danger-zone change has a human signal. Gate released.");

@@ -110,9 +110,16 @@ an owner-authored receipt. Applying `danger-approved` in GitHub mobile records
 an event-scoped workflow receipt. An owner approving review also requires its
 matching revision receipt.
 
-New commits or a changed base require fresh approval. Remove and reapply the
-mobile label after reviewing a new revision; removing it revokes earlier
-receipts. Replies and dispatcher Resume actions are not danger approval.
+New commits or a changed base require fresh approval. Apply the label once; if
+new commits land, the gate removes the stale label and says so, so just
+re-apply it after reviewing the new revision. Removing the label (by hand or by
+the gate) revokes earlier receipts. The gate keeps one status comment on the PR
+(`<!-- danger-gate-status -->`) with the verdict, the protected paths touched
+and the single next step. If it says the label is on but no approval is
+recorded, remove and re-apply it: the gate only removes a label it can prove is
+stale. Fork and Dependabot runs cannot write, so they get neither the comment
+nor the removal; the verdict is the same. Replies and dispatcher Resume actions
+are not danger approval.
 Merging remains separate. API or receipt-publication failures hold the gate.
 
 The spec signal remains a spec in the diff, a `Spec: docs/plans/design/<name>.md`
