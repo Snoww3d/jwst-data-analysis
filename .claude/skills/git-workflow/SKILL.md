@@ -43,6 +43,7 @@ gh pr create --title "<type>: Summary" --body-file /tmp/pr-body.md
 **Never use `$()` or HEREDOC in gh commands** — the bash-discipline hook blocks it. Always write the body to a temp file first with the Write tool, then use `--body-file`.
 
 Required PR body sections (in `/tmp/pr-body.md`):
+- `## Owner summary` first, then `---` — plain language for the product owner, no file paths or code identifiers, exactly these labels: **What changes:**, **Why now:**, **Your call:**, **Risk in plain terms:**, **See it:** (CI warns if missing during the trial)
 - `## Summary` (include `Closes #N`)
 - `## Changes Made`
 - `## Test Plan`
