@@ -201,6 +201,27 @@ The following query parameters are available on both `GET /api/jwstdata/{id}/pre
 
 - Current MongoDB credentials are for development only
 - JWT Bearer authentication is implemented (AuthService + JwtTokenService)
+- ADR 0001 Python auth foundation (#1991): `app/auth/routes.py` exposes POST
+  `/api/auth/register` (201), `/api/auth/login` (200), `/api/auth/refresh` (200)
+  only with `PYTHON_AUTH_ENABLED=true` in full mode. Keep disabled in production
+  until #1186 lockout parity; existing deployment and frontend routing stay on .NET.
+- Python request/response DTOs use the existing **camelCase auth wire contract**.
+  Only allowlisted user profile fields leave the service. Validation returns a
+  sanitized 400, duplicate registration 400, invalid login/refresh 401, and
+  unavailable configuration/persistence 503. Token responses use `Cache-Control: no-store`.
+- `app/db/users.py` owns all user collection operations. Preserve PascalCase BSON,
+  ObjectId IDs, existing named username/email unique indexes (email collation en/2),
+  BCrypt.Net-compatible hashes, and SHA-256 refresh hashes. Use targeted updates
+  and conditional rotation; never replace whole user documents. FailedLoginAttempts
+  and LockedUntil remain available for #1186, which owns their increment/reset policy.
+- Python issuer settings: `JWT_SECRET_KEY` (32+ characters), `JWT_ISSUER` /
+  `JWT_AUDIENCE` (same defaults as .NET), `JWT_ACCESS_TOKEN_EXPIRATION_MINUTES=60`,
+  `JWT_REFRESH_TOKEN_EXPIRATION_DAYS=7`, `JWT_REFRESH_TOKEN_GRACE_WINDOW_SECONDS=60`.
+  `MONGODB_URI` must grant writes and index creation; `MONGODB_DATABASE` retains its
+  existing default. No production setting is enabled by this prerequisite.
+- Refresh rotation preserves the .NET current/previous grace semantics. Missing,
+  null or expired expiration fails closed; simultaneous requests use conditional
+  writes and at most one retry. Active lockouts also reject login/refresh.
 - Use environment variables for sensitive configuration
 
 ## Git Workflow

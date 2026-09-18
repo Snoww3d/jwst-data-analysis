@@ -55,6 +55,12 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 - `GET /api/health` - JSON response with component health status (includes processing engine and MAST proxy connectivity). Returns `Healthy`/`Degraded`.
 
 **Authentication** (JWT Bearer):
+> Python foundation (#1991): `/api/auth/register`, `/api/auth/login`, and
+> `/api/auth/refresh` mirror these three .NET contracts in full engine mode.
+> They return 503 unless `PYTHON_AUTH_ENABLED=true` is explicitly set for isolated
+> development with Mongo write credentials. Production stays on .NET until #1186
+> lockout parity and cutover review; CE never mounts Python auth.
+
 - `POST /auth/register` - Create new account (returns tokens)
 - `POST /auth/login` - Login with username/password (returns tokens)
 - `POST /auth/refresh` - Refresh access token using refresh token
