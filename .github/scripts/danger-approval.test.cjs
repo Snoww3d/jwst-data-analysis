@@ -173,7 +173,7 @@ test("gate CLI records mobile approval and reruns against the live base", () => 
     executable(
       "gh",
       `const fs=require('node:fs');const args=process.argv.slice(2);const endpoint=args.find(a=>a.startsWith('repos/'));let value;
-      if(args.includes('POST')){const request=JSON.parse(fs.readFileSync(0,'utf8'));fs.writeFileSync(${JSON.stringify(path.join(dir, "posted.json"))},JSON.stringify(request));value={...request,user:{login:'github-actions[bot]',type:'Bot'},created_at:'2026-09-06T12:00:01Z'};}
+      if(args.includes('POST')){const request=JSON.parse(fs.readFileSync(0,'utf8'));if(request.body.startsWith('<!-- pos-danger-approval:v1 '))fs.writeFileSync(${JSON.stringify(path.join(dir, "posted.json"))},JSON.stringify(request));value={...request,user:{login:'github-actions[bot]',type:'Bot'},created_at:'2026-09-06T12:00:01Z'};}
       else if(endpoint.endsWith('/reviews'))value=[[]];
       else if(endpoint.endsWith('/events'))value=[[{id:1,event:'labeled',label:{name:'danger-approved'},actor:{login:'me'},created_at:'2026-09-06T12:00:00Z'}]];
       else if(endpoint.includes('/comments'))value=[JSON.parse(process.env.APP_COMMENTS||'[]')];

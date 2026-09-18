@@ -61,7 +61,7 @@ Artifacts chain through git, and the same slug carries across all three:
 
 The `require-plan-file` hook already enforces the Build stage. PR reviews run against [`REVIEW.md`](REVIEW.md).
 
-**Danger zones.** Merges stay autonomous. The exception is a PR touching a path listed in `danger_zones.paths` in [`.claude/sdlc.json`](.claude/sdlc.json) — auth, persistence, storage, secrets and deploy config, CI workflows, and the agent's own hooks. Those require a human signal plus a spec, enforced by the `Danger Zone` check. The human signal is an approving review from a non-bot, or the `danger-approved` label applied by the repo owner (a solo maintainer cannot review their own PR). A PR touching none of those paths is not gated at all.
+**Danger zones.** Merges stay autonomous. The exception is a PR touching a path listed in `danger_zones.paths` in [`.claude/sdlc.json`](.claude/sdlc.json) — auth, persistence, storage, secrets and deploy config, CI workflows, and the agent's own hooks. Those require a human signal plus a spec, enforced by the `Danger Zone` check. The human signal is an approving review from a non-bot, or the `danger-approved` label applied by the repo owner (a solo maintainer cannot review their own PR). Approval covers one revision: apply the label once, and if new commits land the gate removes it and says so in its status comment on the PR, so just re-apply it. That comment always names the one next step. A PR touching none of those paths is not gated at all.
 
 ## Core Rules
 

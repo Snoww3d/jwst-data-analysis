@@ -8,11 +8,29 @@ name: Danger Zone
 # a spec signal. See `.github/scripts/danger-zone.cjs` and the `sdlc` skill.
 #
 # `labeled` / `unlabeled` are triggers so applying or removing the label
-# re-evaluates the gate without a new push.
+# re-evaluates the gate without a new push; `edited` does the same for a PR
+# body gaining a `Spec:` or `SDLC-Exception:` line.
+#
+# Approval covers one revision. When new commits land, the gate removes a
+# provably stale `danger-approved` label (so re-approval is a single add) and
+# keeps one status comment on the PR saying what it decided and the one thing
+# to do next. Removals made with GITHUB_TOKEN do not trigger workflow runs, so
+# the bot's own `unlabeled` event cannot loop, and it is never an owner action.
+# Both are best-effort and never change the verdict; fork and Dependabot runs
+# get a read-only token and skip them with a log line.
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    types:
+      [
+        opened,
+        synchronize,
+        reopened,
+        ready_for_review,
+        edited,
+        labeled,
+        unlabeled,
+      ]
   pull_request_review:
     types: [submitted, dismissed]
 
@@ -23,7 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write # records revision receipts for explicit owner approval events
+      # Records revision receipts for explicit owner approval events, keeps the
+      # status comment current, and removes a stale danger-approved label.
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -42,4 +62,6 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REPO: ${{ github.repository }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          ACTOR: ${{ github.actor }}
         run: node .github/scripts/danger-zone.cjs
