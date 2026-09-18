@@ -93,6 +93,11 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    - `## Test Plan`, `## Documentation Checklist`, `## Tech Debt Impact` with at least one box checked
    - `## Risk & Rollback` with non-empty `Risk:` and `Rollback:` values
 
+   It also **warns** (non-blocking, during a trial) when the body does not open with
+   `## Owner summary` — five plain-language lines for the product owner
+   (**What changes:**, **Why now:**, **Your call:**, **Risk in plain terms:**,
+   **See it:**) followed by `---`. The technical sections stay required as-is.
+
    Do not delete or rename template sections — the check looks for them by heading.
    Draft PRs are exempt until marked ready for review.
 

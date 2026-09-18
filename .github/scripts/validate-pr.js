@@ -17,6 +17,9 @@ const prHeadRef = (process.env.PR_HEAD_REF || "").trim();
 const isDependabot = /^dependabot\//i.test(prHeadRef);
 
 const errors = [];
+// Warnings are reported but never fail the check. Used for rules on trial
+// (e.g. the Owner summary) so open PRs don't go red when a rule is added.
+const warnings = [];
 
 const VALID_TITLE_PREFIXES = "feat|fix|docs|refactor|test|chore|perf|ci";
 const VALID_BRANCH_PREFIXES =
@@ -29,6 +32,17 @@ const REQUIRED_SECTIONS = [
   "Documentation Checklist",
   "Tech Debt Impact",
   "Risk & Rollback",
+];
+
+// Trial (warning-only): product-owner summary at the top of the body. Promote
+// to REQUIRED_SECTIONS/errors once the trial ends.
+const OWNER_SUMMARY_SECTION = "Owner summary";
+const OWNER_SUMMARY_LABELS = [
+  "What changes",
+  "Why now",
+  "Your call",
+  "Risk in plain terms",
+  "See it",
 ];
 
 function escapeRegExp(value) {
@@ -222,6 +236,27 @@ if (!isDependabot) {
     }
   }
 
+  // --- Owner summary (trial: warnings only) ---
+  const ownerSection = extractSection(OWNER_SUMMARY_SECTION);
+  if (!ownerSection) {
+    warnings.push(
+      `Missing \`## ${OWNER_SUMMARY_SECTION}\` at the top of the body (trial: will become required).`,
+    );
+  } else {
+    const ownerContent = stripComments(ownerSection);
+    for (const label of OWNER_SUMMARY_LABELS) {
+      const labelRegex = new RegExp(
+        `^-\\s*\\*\\*${escapeRegExp(label)}:\\*\\*[ \\t]*\\S`,
+        "im",
+      );
+      if (!labelRegex.test(ownerContent)) {
+        warnings.push(
+          `\`## ${OWNER_SUMMARY_SECTION}\` is missing a filled-in \`**${label}:**\` line.`,
+        );
+      }
+    }
+  }
+
   // --- Closes #N or "No linked issue" ---
   const strippedBody = stripComments(prBody);
   const hasClosingKeyword =
@@ -237,6 +272,19 @@ if (!isDependabot) {
 }
 
 // --- Report ---
+if (warnings.length > 0) {
+  console.warn("PR standards warnings (non-blocking):");
+  for (const warning of warnings) {
+    console.warn(`- ${warning}`);
+  }
+  console.warn("");
+  if (process.env.GITHUB_ACTIONS === "true") {
+    console.log(
+      `::warning title=PR standards::${warnings.length} warning(s) — add the Owner summary from .github/PULL_REQUEST_TEMPLATE.md`,
+    );
+  }
+}
+
 if (errors.length > 0) {
   console.error("PR standards validation failed:");
   for (const error of errors) {

@@ -171,6 +171,7 @@ Validates PR metadata via `.github/scripts/validate-pr.js`:
 - `Closes #N` or `No linked issue` present
 - Tech Debt Impact checkbox
 - Risk & Rollback section
+- `## Owner summary` at the top with its five labels (warning only during the trial)
 
 ### Security Scanning (`security.yml`)
 
