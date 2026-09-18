@@ -1,6 +1,7 @@
 // npm run test:gate  (node --test .github/scripts/*.test.cjs)
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const {
   evaluate: evaluateGate,
   specReference,
@@ -241,4 +242,28 @@ test("CRLF bodies still match the Spec: and marker lines", () => {
     ownerLogin: OWNER,
   });
   assert.deepEqual(r.errors, []);
+});
+
+// The shared path sanitizer is reachable from `app/mast/`, outside the
+// `app/storage/**` glob that used to cover it. Pin the real config so a
+// helper-only PR cannot slip the gate.
+test("real config gates a path_security.py-only change on both signals", () => {
+  const realConfig = JSON.parse(fs.readFileSync(".claude/sdlc.json", "utf8"));
+  const r = evaluate({
+    changedFiles: ["processing-engine/app/mast/path_security.py"],
+    config: realConfig,
+    ownerLogin: OWNER,
+  });
+  assert.equal(r.gated, true);
+  assert.equal(humanErrors(r).length, 1);
+  assert.equal(specErrors(r).length, 1);
+  const released = evaluate({
+    changedFiles: ["processing-engine/app/mast/path_security.py"],
+    ...humanApproval,
+    body: marker,
+    diffStats: { additions: 5, deletions: 0 },
+    config: realConfig,
+    ownerLogin: OWNER,
+  });
+  assert.deepEqual(released.errors, []);
 });

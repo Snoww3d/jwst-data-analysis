@@ -26,6 +26,7 @@
       "frontend/jwst-frontend/src/services/apiClient.ts",
       "processing-engine/app/db/**",
       "processing-engine/app/storage/**",
+      "processing-engine/app/mast/path_security.py",
       "backend/JwstDataAnalysis.API/Services/MongoDBService.cs",
       "backend/JwstDataAnalysis.API/appsettings*.json",
       "docker/.env*",

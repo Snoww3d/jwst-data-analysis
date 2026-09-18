@@ -19,10 +19,13 @@ class LocalStorage(StorageProvider):
 
     def _safe_path(self, key: str) -> Path:
         """Resolve a key to an absolute path, guarding against path traversal."""
-        full = (self._base_path / key).resolve()
-        if not str(full).startswith(str(self._base_path)):
-            raise ValueError(f"Invalid storage key: {key}")
-        return full
+        # Import lazily: app.mast initializes routes, which import the storage factory.
+        from app.mast.path_security import ensure_within
+
+        try:
+            return ensure_within(self._base_path / key, self._base_path)
+        except ValueError as exc:
+            raise ValueError(f"Invalid storage key: {key}") from exc
 
     def read_to_temp(self, key: str) -> Path:
         """Return the actual local path (no temp copy needed for local storage)."""
