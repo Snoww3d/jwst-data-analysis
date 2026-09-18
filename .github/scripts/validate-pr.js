@@ -210,12 +210,12 @@ if (!isDependabot) {
       /\*\*|__|(?<![\\*])\*(?!\*)|(?<![\\_])_(?!_)/g,
       "",
     );
-    if (!/Risk:\s*\S+/i.test(normalizedRiskSection)) {
+    if (!/Risk:[ \t]*\S+/i.test(normalizedRiskSection)) {
       errors.push(
         "`## Risk & Rollback` must include a non-empty `Risk:` value.",
       );
     }
-    if (!/Rollback:\s*\S+/i.test(normalizedRiskSection)) {
+    if (!/Rollback:[ \t]*\S+/i.test(normalizedRiskSection)) {
       errors.push(
         "`## Risk & Rollback` must include a non-empty `Rollback:` value.",
       );
