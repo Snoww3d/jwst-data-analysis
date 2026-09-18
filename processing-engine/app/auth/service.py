@@ -1,7 +1,8 @@
-"""Auth foundation; failed-attempt/lockout counter parity is owned by #1186."""
+"""Auth foundation with .NET-compatible lockout (#1186)."""
 
 import base64
 import hashlib
+import logging
 import os
 import secrets
 from dataclasses import dataclass
@@ -16,13 +17,22 @@ from pymongo.errors import DuplicateKeyError
 from starlette.concurrency import run_in_threadpool
 
 from app.auth.deps import _ALGORITHM, _DEFAULT_AUDIENCE, _DEFAULT_ISSUER, _ROLE_CLAIMS
-from app.auth.models import LoginRequest, RegisterRequest, TokenResponse, UserInfo
+from app.auth.models import (
+    LockoutStatus,
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserInfo,
+)
 from app.db.users import UserRepository
 
+
+logger = logging.getLogger(__name__)
 
 DUPLICATE = "An account with these details already exists. Please try different credentials."
 INVALID_LOGIN = "Invalid username or password"
 INVALID_REFRESH = "Invalid or expired refresh token"
+USER_NOT_FOUND = "User not found"
 
 
 class AuthError(Exception):
@@ -40,6 +50,9 @@ class TokenSettings:
     access_minutes: int = 60
     refresh_days: int = 7
     grace_seconds: int = 60
+    # JwtSettings.MaxFailedLoginAttempts / AccountLockoutMinutes defaults.
+    max_failed_attempts: int = 5
+    lockout_minutes: int = 15
 
     @classmethod
     def from_env(cls) -> "TokenSettings":
@@ -51,6 +64,8 @@ class TokenSettings:
                 access_minutes=int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES", "60")),
                 refresh_days=int(os.environ.get("JWT_REFRESH_TOKEN_EXPIRATION_DAYS", "7")),
                 grace_seconds=int(os.environ.get("JWT_REFRESH_TOKEN_GRACE_WINDOW_SECONDS", "60")),
+                max_failed_attempts=int(os.environ.get("JWT_MAX_FAILED_LOGIN_ATTEMPTS", "5")),
+                lockout_minutes=int(os.environ.get("JWT_ACCOUNT_LOCKOUT_MINUTES", "15")),
             )
             if (
                 len(settings.secret) < 32
@@ -59,6 +74,8 @@ class TokenSettings:
                 or not 1 <= settings.access_minutes <= 525600
                 or not 1 <= settings.refresh_days <= 3650
                 or not 0 <= settings.grace_seconds <= 3600
+                or not 1 <= settings.max_failed_attempts <= 100
+                or not 1 <= settings.lockout_minutes <= 1440
             ):
                 raise ValueError("Invalid auth configuration")
         except ValueError as exc:
@@ -122,6 +139,17 @@ def _user_info(user: dict) -> UserInfo:
         organization=user.get("Organization"),
         created_at=_utc(user.get("CreatedAt", utcnow())),
         last_login_at=_utc(user["LastLoginAt"]) if user.get("LastLoginAt") else None,
+    )
+
+
+def _lockout_status(user: dict, now: datetime) -> LockoutStatus:
+    locked_until = user.get("LockedUntil")
+    return LockoutStatus(
+        user_id=str(user["_id"]),
+        username=user.get("Username", ""),
+        is_locked=_future(locked_until, now),
+        failed_login_attempts=int(user.get("FailedLoginAttempts") or 0),
+        locked_until=_utc(locked_until) if locked_until else None,
     )
 
 
@@ -196,17 +224,32 @@ class AuthService:
             verify_password, request.password, user.get("PasswordHash") if user else None
         )
         now = utcnow()
-        if (
-            not valid
-            or user is None
-            or not user.get("IsActive", True)
-            or _future(user.get("LockedUntil"), now)
-        ):
+        if user is None or not user.get("IsActive", True):
             raise AuthError(401, INVALID_LOGIN)
-        # #1186 owns failed-attempt increments/resets. Preserve those fields.
+        # Mirrors .NET AuthService.LoginAsync: an active lockout rejects without
+        # counting; an expired one restarts the counter before this attempt.
+        if _future(user.get("LockedUntil"), now):
+            logger.warning("Login rejected for locked account %s", user["_id"])
+            raise AuthError(401, INVALID_LOGIN)
+        if user.get("LockedUntil") is not None:
+            await self.repo.reset_lockout(user["_id"])
+            user["FailedLoginAttempts"] = 0
+            user["LockedUntil"] = None
+        if not valid:
+            attempts = await self.repo.record_failed_login(
+                user,
+                self.settings.max_failed_attempts,
+                now + timedelta(minutes=self.settings.lockout_minutes),
+            )
+            if attempts >= self.settings.max_failed_attempts:
+                logger.warning("Account %s locked after %d failed logins", user["_id"], attempts)
+            raise AuthError(401, INVALID_LOGIN)
         user["LastLoginAt"] = now
         response, fields = self._tokens(user, now)
         fields["LastLoginAt"] = now
+        if user.get("FailedLoginAttempts"):
+            # Reset in the same conditional write that issues the tokens.
+            fields.update(FailedLoginAttempts=0, LockedUntil=None)
         if not await self.repo.save_login(user, fields, utcnow()):
             raise AuthError(401, INVALID_LOGIN)
         return response
@@ -242,3 +285,18 @@ class AuthService:
             if await self.repo.rotate(user, incoming, fields, utcnow()):
                 return response
         raise AuthError(401, INVALID_REFRESH)
+
+    async def lockout_status(self, user_id: str) -> LockoutStatus:
+        user = await self.repo.by_id(user_id)
+        if user is None:
+            raise AuthError(404, USER_NOT_FOUND)
+        return _lockout_status(user, utcnow())
+
+    async def unlock(self, user_id: str, admin_id: str) -> LockoutStatus:
+        user = await self.repo.by_id(user_id)
+        # Idempotent: unlocking an unlocked account is a successful no-op reset.
+        if user is None or not await self.repo.reset_lockout(user["_id"]):
+            raise AuthError(404, USER_NOT_FOUND)
+        logger.info("Admin %s unlocked account %s", admin_id, user["_id"])
+        user.update(FailedLoginAttempts=0, LockedUntil=None)
+        return _lockout_status(user, utcnow())

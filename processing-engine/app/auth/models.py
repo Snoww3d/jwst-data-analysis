@@ -79,3 +79,13 @@ class TokenResponse(AuthModel):
     expires_at: datetime
     token_type: str = "Bearer"
     user: UserInfo
+
+
+class LockoutStatus(AuthModel):
+    """Admin lockout view: an explicit allowlist, never the user document."""
+
+    user_id: str
+    username: str
+    is_locked: bool
+    failed_login_attempts: int
+    locked_until: datetime | None = None
