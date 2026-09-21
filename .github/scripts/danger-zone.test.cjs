@@ -267,3 +267,106 @@ test("real config gates a path_security.py-only change on both signals", () => {
   });
   assert.deepEqual(released.errors, []);
 });
+
+// --- Dependabot action-bump exemption ---
+const REPO = "Snoww3d/jwst-data-analysis";
+const bumpConfig = {
+  ...config,
+  danger_zones: { ...config.danger_zones, dependabot_action_bumps: true },
+};
+const bumpDiff = [
+  "diff --git a/.github/workflows/security.yml b/.github/workflows/security.yml",
+  "--- a/.github/workflows/security.yml",
+  "+++ b/.github/workflows/security.yml",
+  "@@ -10,7 +10,7 @@ jobs:",
+  "       - name: Init",
+  "-        uses: github/codeql-action/init@v4.37.9",
+  "+        uses: github/codeql-action/init@v4.38.0",
+  "       - name: Analyze",
+  "-        uses: github/codeql-action/analyze@v4.37.9 # pinned",
+  "+        uses: github/codeql-action/analyze@v4.38.0 # pinned",
+  "-      - uses: actions/checkout@v7",
+  "+      - uses: actions/checkout@v8",
+  "",
+].join("\n");
+const bump = {
+  changedFiles: [".github/workflows/security.yml"],
+  author: "dependabot[bot]",
+  headRepo: REPO,
+  repo: REPO,
+  workflowDiff: bumpDiff,
+  config: bumpConfig,
+  ownerLogin: OWNER,
+};
+const held = (overrides) => humanErrors(evaluate({ ...bump, ...overrides }));
+
+test("dependabot uses: bump in a workflow is released with no signals", () => {
+  const r = evaluate(bump);
+  assert.equal(r.gated, true);
+  assert.equal(r.exempt, "dependabot");
+  assert.deepEqual(r.errors, []);
+});
+
+test("the exemption is off unless the config switch is on", () => {
+  const r = evaluate({ ...bump, config });
+  assert.equal(r.exempt, undefined);
+  assert.equal(humanErrors(r).length, 1);
+  assert.equal(specErrors(r).length, 1);
+});
+
+test("a human author with the same diff is still gated", () => {
+  assert.equal(held({ author: OWNER }).length, 1);
+});
+
+test("a fork head is still gated even for dependabot", () => {
+  assert.equal(held({ headRepo: "someone/jwst-data-analysis" }).length, 1);
+});
+
+test("a bump that also touches a non-workflow danger path is gated", () => {
+  const changedFiles = [".github/workflows/security.yml", ...dangerous];
+  assert.equal(held({ changedFiles }).length, 1);
+});
+
+test("any non-uses: line in the diff holds the gate", () => {
+  const withRun = bumpDiff.replace(
+    "+        uses: github/codeql-action/init@v4.38.0",
+    "+        uses: github/codeql-action/init@v4.38.0\n+        run: echo bumped",
+  );
+  assert.equal(held({ workflowDiff: withRun }).length, 1);
+  const withInput = bumpDiff.replace(
+    "-      - uses: actions/checkout@v7",
+    "-      - uses: actions/checkout@v7\n-        with:\n+        with:\n+          token: t",
+  );
+  assert.equal(held({ workflowDiff: withInput }).length, 1);
+});
+
+test("swapping the action name at the same line is not a bump", () => {
+  const swapped = bumpDiff.replace(
+    "+      - uses: actions/checkout@v8",
+    "+      - uses: evil/checkout@v8",
+  );
+  assert.equal(held({ workflowDiff: swapped }).length, 1);
+});
+
+test("an unpaired uses: addition or removal is not a bump", () => {
+  const added = bumpDiff + "+      - uses: actions/setup-node@v5\n";
+  assert.equal(held({ workflowDiff: added }).length, 1);
+  const removed = bumpDiff + "-      - uses: actions/setup-node@v5\n";
+  assert.equal(held({ workflowDiff: removed }).length, 1);
+});
+
+test("an empty diff never releases", () => {
+  assert.equal(held({ workflowDiff: "" }).length, 1);
+});
+
+test("real config has the switch on and gates the gate scripts", () => {
+  const realConfig = JSON.parse(fs.readFileSync(".claude/sdlc.json", "utf8"));
+  assert.equal(realConfig.danger_zones.dependabot_action_bumps, true);
+  const r = evaluate({
+    changedFiles: [".github/scripts/danger-zone.cjs"],
+    config: realConfig,
+    ownerLogin: OWNER,
+  });
+  assert.equal(r.gated, true);
+  assert.equal(evaluate({ ...bump, config: realConfig }).exempt, "dependabot");
+});

@@ -14,7 +14,8 @@
     "evals_in_ci": false
   },
   "danger_zones": {
-    "$comment": "Paths where a mistake is expensive. A PR touching any of these needs human approval before merge and a spec; everything else merges autonomously. Enforced by .github/workflows/danger-zone.yml.",
+    "$comment": "Paths where a mistake is expensive. A PR touching any of these needs human approval before merge and a spec; everything else merges autonomously. Enforced by .github/workflows/danger-zone.yml. `dependabot_action_bumps` releases the gate for a Dependabot PR whose only change is `uses:` version refs in workflow files; see docs/plans/design/danger-gate-dependabot-exemption.md.",
+    "dependabot_action_bumps": true,
     "paths": [
       "processing-engine/app/auth/**",
       "backend/JwstDataAnalysis.API/Controllers/AuthController*.cs",
