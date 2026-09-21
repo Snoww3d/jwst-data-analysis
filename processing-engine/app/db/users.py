@@ -4,7 +4,9 @@ import re
 from datetime import datetime
 from typing import Protocol
 
-from pymongo import IndexModel
+from bson import ObjectId
+from bson.errors import InvalidId
+from pymongo import IndexModel, ReturnDocument
 from pymongo.collation import Collation
 
 
@@ -13,9 +15,14 @@ class UserRepository(Protocol):
     async def by_username(self, username: str) -> dict | None: ...
     async def by_email(self, email: str) -> dict | None: ...
     async def by_refresh(self, token_hash: str, now: datetime) -> dict | None: ...
+    async def by_id(self, user_id: str) -> dict | None: ...
     async def insert(self, user: dict) -> None: ...
     async def save_login(self, user: dict, fields: dict, now: datetime) -> bool: ...
     async def rotate(self, user: dict, token_hash: str, fields: dict, now: datetime) -> bool: ...
+    async def record_failed_login(
+        self, user: dict, max_attempts: int, locked_until: datetime
+    ) -> int: ...
+    async def reset_lockout(self, user_id: ObjectId) -> bool: ...
 
 
 def _eligible(now: datetime) -> dict:
@@ -67,6 +74,14 @@ class MongoUserRepository:
     async def by_refresh(self, token_hash: str, now: datetime) -> dict | None:
         return await self._col.find_one(_refresh_match(token_hash, now))
 
+    async def by_id(self, user_id: str) -> dict | None:
+        try:
+            object_id = ObjectId(user_id)
+        except (InvalidId, TypeError):
+            # A malformed id cannot name a user: same answer as an unknown one.
+            return None
+        return await self._col.find_one({"_id": object_id})
+
     async def insert(self, user: dict) -> None:
         await self._col.insert_one(user)
 
@@ -92,5 +107,38 @@ class MongoUserRepository:
                 "$and": [_eligible(now), _refresh_match(token_hash, now)],
             },
             {"$set": fields},
+        )
+        return result.matched_count == 1
+
+    async def record_failed_login(
+        self, user: dict, max_attempts: int, locked_until: datetime
+    ) -> int:
+        # One atomic pipeline update: concurrent failures each count, and the
+        # attempt that reaches the threshold sets LockedUntil (.NET parity).
+        attempts = {"$add": [{"$ifNull": ["$FailedLoginAttempts", 0]}, 1]}
+        updated = await self._col.find_one_and_update(
+            {"_id": user["_id"]},
+            [
+                {"$set": {"FailedLoginAttempts": attempts}},
+                {
+                    "$set": {
+                        "LockedUntil": {
+                            "$cond": [
+                                {"$gte": ["$FailedLoginAttempts", max_attempts]},
+                                locked_until,
+                                {"$ifNull": ["$LockedUntil", None]},
+                            ]
+                        }
+                    }
+                },
+            ],
+            projection={"FailedLoginAttempts": 1},
+            return_document=ReturnDocument.AFTER,
+        )
+        return 0 if updated is None else int(updated["FailedLoginAttempts"])
+
+    async def reset_lockout(self, user_id: ObjectId) -> bool:
+        result = await self._col.update_one(
+            {"_id": user_id}, {"$set": {"FailedLoginAttempts": 0, "LockedUntil": None}}
         )
         return result.matched_count == 1

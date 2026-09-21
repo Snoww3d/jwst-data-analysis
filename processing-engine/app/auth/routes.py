@@ -1,4 +1,4 @@
-"""Opt-in auth foundation. Production activation must wait for #1186 parity."""
+"""Opt-in Python auth: login/register/refresh plus admin lockout tools (#1186)."""
 
 import os
 
@@ -8,7 +8,14 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from pymongo.errors import PyMongoError
 
-from app.auth.models import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
+from app.auth.deps import AuthenticatedUser, require_role
+from app.auth.models import (
+    LockoutStatus,
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+)
 from app.auth.service import AuthError, AuthService, TokenSettings
 from app.db.client import MongoNotConfiguredError, get_database
 from app.db.users import MongoUserRepository
@@ -68,3 +75,21 @@ async def login(request: LoginRequest, service: AuthService = Depends(get_auth_s
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(request: RefreshRequest, service: AuthService = Depends(get_auth_service)):
     return await service.refresh(request.refresh_token)
+
+
+@router.get("/admin/lockout-status/{user_id}", response_model=LockoutStatus)
+async def lockout_status(
+    user_id: str,
+    _admin: AuthenticatedUser = Depends(require_role("Admin")),
+    service: AuthService = Depends(get_auth_service),
+):
+    return await service.lockout_status(user_id)
+
+
+@router.post("/admin/unlock/{user_id}", response_model=LockoutStatus)
+async def unlock(
+    user_id: str,
+    admin: AuthenticatedUser = Depends(require_role("Admin")),
+    service: AuthService = Depends(get_auth_service),
+):
+    return await service.unlock(user_id, admin.user_id)

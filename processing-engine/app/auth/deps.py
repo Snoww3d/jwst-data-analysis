@@ -11,7 +11,7 @@ full ``schemas.microsoft.com`` claim URI (the handler's outbound map does not
 shorten ``ClaimTypes.Role``).
 
 Shared with the opt-in Python issuer (service.py, #1991). Production issuance
-stays in .NET until #1186 lockout parity and the later auth cutover.
+stays in .NET until the later ADR 0001 auth cutover.
 """
 
 import os

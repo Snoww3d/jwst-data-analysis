@@ -10,6 +10,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from bson import ObjectId
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -25,7 +26,7 @@ from app.auth.service import (
     utcnow,
 )
 from app.db.users import MongoUserRepository
-from tests.test_auth_port import PASSWORD, SECRET, assert_tokens, legacy_user
+from tests.test_auth_port import PASSWORD, SECRET, assert_tokens, bearer, legacy_user
 
 
 @pytest.fixture
@@ -72,8 +73,10 @@ async def test_existing_user_login_refresh_grace_replay(client, collection):
     current = login.json()["refreshToken"]
     stored = await collection.find_one({"_id": user["_id"]})
     assert stored["RefreshToken"] == hash_refresh(current)
-    for key in ("PasswordHash", "FailedLoginAttempts", "LockedUntil", "UnrelatedPrivateField"):
+    for key in ("PasswordHash", "LockedUntil", "UnrelatedPrivateField"):
         assert stored[key] == original[key]
+    # Successful login clears prior failures (.NET parity, #1186).
+    assert stored["FailedLoginAttempts"] == 0
     for raw in (current, current):
         response = await client.post("/api/auth/refresh", json={"refreshToken": raw})
         assert response.status_code == 200
@@ -277,3 +280,85 @@ async def test_missing_password_hash_returns_sanitized_rejection(client, collect
     assert response.headers["Cache-Control"] == "no-store"
     stored = await collection.find_one({"_id": user["_id"]})
     assert stored["RefreshToken"] == user["RefreshToken"]
+
+
+async def test_lockout_then_admin_unlock_then_login(client, collection, monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", SECRET)  # admin bearer validation
+    user = legacy_user(FailedLoginAttempts=0)
+    await collection.insert_one(user)
+    wrong = {"username": "legacy", "password": "WrongPass1!"}
+    for _ in range(5):
+        assert (await client.post("/api/auth/login", json=wrong)).status_code == 401
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert stored["FailedLoginAttempts"] == 5
+    assert stored["LockedUntil"] is not None
+    right = {"username": "legacy", "password": PASSWORD}
+    locked = await client.post("/api/auth/login", json=right)
+    assert locked.status_code == 401
+    assert locked.json() == {"error": INVALID_LOGIN}
+    # An active lockout does not keep counting.
+    assert (await collection.find_one({"_id": user["_id"]}))["FailedLoginAttempts"] == 5
+
+    status_path = f"/api/auth/admin/lockout-status/{user['_id']}"
+    status = await client.get(status_path, headers=bearer())
+    assert status.status_code == 200
+    assert status.json()["isLocked"] is True
+    assert status.json()["failedLoginAttempts"] == 5
+    assert (
+        await client.post(f"/api/auth/admin/unlock/{user['_id']}", headers=bearer("User"))
+    ).status_code == 403
+    for _ in range(2):  # idempotent
+        unlocked = await client.post(f"/api/auth/admin/unlock/{user['_id']}", headers=bearer())
+        assert unlocked.status_code == 200
+        assert unlocked.json()["isLocked"] is False
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert (stored["FailedLoginAttempts"], stored["LockedUntil"]) == (0, None)
+    assert stored["UnrelatedPrivateField"] == "must-never-leak"
+
+    login = await client.post("/api/auth/login", json=right)
+    assert login.status_code == 200
+    assert_tokens(login.json())
+    assert (await client.get(status_path, headers=bearer())).json()["isLocked"] is False
+
+
+async def test_expired_lockout_restarts_counter(client, collection):
+    user = legacy_user(FailedLoginAttempts=5, LockedUntil=utcnow() - timedelta(seconds=1))
+    await collection.insert_one(user)
+    response = await client.post(
+        "/api/auth/login", json={"username": "legacy", "password": "WrongPass1!"}
+    )
+    assert response.status_code == 401
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert (stored["FailedLoginAttempts"], stored["LockedUntil"]) == (1, None)
+
+
+async def test_concurrent_failures_all_count_and_lock(repo, collection):
+    user = legacy_user(FailedLoginAttempts=0)
+    await collection.insert_one(user)
+    until = (utcnow() + timedelta(minutes=15)).replace(microsecond=0)
+    counts = await asyncio.gather(*(repo.record_failed_login(user, 5, until) for _ in range(7)))
+    assert sorted(counts) == list(range(1, 8))
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert stored["FailedLoginAttempts"] == 7
+    assert stored["LockedUntil"].replace(tzinfo=None) == until.replace(tzinfo=None)
+
+
+async def test_failure_counter_handles_missing_fields(repo, collection):
+    user = legacy_user()
+    del user["FailedLoginAttempts"], user["LockedUntil"]
+    await collection.insert_one(user)
+    until = utcnow() + timedelta(minutes=15)
+    assert await repo.record_failed_login(user, 5, until) == 1
+    stored = await collection.find_one({"_id": user["_id"]})
+    assert stored["FailedLoginAttempts"] == 1
+    assert stored.get("LockedUntil") is None
+    assert stored["UnrelatedPrivateField"] == "must-never-leak"
+
+
+async def test_by_id_and_reset_unknown_or_malformed(repo, collection):
+    user = legacy_user()
+    await collection.insert_one(user)
+    assert (await repo.by_id(str(user["_id"])))["_id"] == user["_id"]
+    for bad in ("not-an-object-id", "", str(ObjectId())):
+        assert await repo.by_id(bad) is None
+    assert not await repo.reset_lockout(ObjectId())

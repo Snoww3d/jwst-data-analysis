@@ -204,7 +204,14 @@ The following query parameters are available on both `GET /api/jwstdata/{id}/pre
 - ADR 0001 Python auth foundation (#1991): `app/auth/routes.py` exposes POST
   `/api/auth/register` (201), `/api/auth/login` (200), `/api/auth/refresh` (200)
   only with `PYTHON_AUTH_ENABLED=true` in full mode. Keep disabled in production
-  until #1186 lockout parity; existing deployment and frontend routing stay on .NET.
+  until the ADR 0001 cutover; existing deployment and frontend routing stay on .NET.
+- Lockout parity (#1186): wrong passwords increment `FailedLoginAttempts` atomically;
+  reaching `JWT_MAX_FAILED_LOGIN_ATTEMPTS` (5) sets `LockedUntil` for
+  `JWT_ACCOUNT_LOCKOUT_MINUTES` (15). Active lockouts reject without counting, expired
+  ones restart the counter, and a successful login resets it. Admin-only
+  `GET /api/auth/admin/lockout-status/{userId}` and `POST /api/auth/admin/unlock/{userId}`
+  return an allowlisted `{userId, username, isLocked, failedLoginAttempts, lockedUntil}`
+  (404 for unknown/malformed ids); unlock is idempotent and logs the acting admin id.
 - Python request/response DTOs use the existing **camelCase auth wire contract**.
   Only allowlisted user profile fields leave the service. Validation returns a
   sanitized 400, duplicate registration 400, invalid login/refresh 401, and
@@ -213,7 +220,7 @@ The following query parameters are available on both `GET /api/jwstdata/{id}/pre
   ObjectId IDs, existing named username/email unique indexes (email collation en/2),
   BCrypt.Net-compatible hashes, and SHA-256 refresh hashes. Use targeted updates
   and conditional rotation; never replace whole user documents. FailedLoginAttempts
-  and LockedUntil remain available for #1186, which owns their increment/reset policy.
+  and LockedUntil keep the .NET semantics (missing = 0 / unlocked).
 - Python issuer settings: `JWT_SECRET_KEY` (32+ characters), `JWT_ISSUER` /
   `JWT_AUDIENCE` (same defaults as .NET), `JWT_ACCESS_TOKEN_EXPIRATION_MINUTES=60`,
   `JWT_REFRESH_TOKEN_EXPIRATION_DAYS=7`, `JWT_REFRESH_TOKEN_GRACE_WINDOW_SECONDS=60`.

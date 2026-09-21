@@ -58,8 +58,10 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 > Python foundation (#1991): `/api/auth/register`, `/api/auth/login`, and
 > `/api/auth/refresh` mirror these three .NET contracts in full engine mode.
 > They return 503 unless `PYTHON_AUTH_ENABLED=true` is explicitly set for isolated
-> development with Mongo write credentials. Production stays on .NET until #1186
-> lockout parity and cutover review; CE never mounts Python auth.
+> development with Mongo write credentials. Production stays on .NET until the
+> cutover review; CE never mounts Python auth. The Python login applies .NET-compatible
+> lockout (#1186) and adds Admin-only `GET /auth/admin/lockout-status/{userId}` and
+> `POST /auth/admin/unlock/{userId}` (Python only; no .NET equivalent).
 
 - `POST /auth/register` - Create new account (returns tokens)
 - `POST /auth/login` - Login with username/password (returns tokens)
