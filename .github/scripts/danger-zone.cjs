@@ -22,6 +22,11 @@
  *   - a `SDLC-Exception: plan-in-pr-body` line in the PR body, accepted only
  *     when the PR changes fewer than `SMALL_DIFF_LINES` lines.
  *
+ * Exemption: when `danger_zones.dependabot_action_bumps` is set, a PR by
+ * `dependabot[bot]` from this repo whose only gated files are workflows and
+ * whose only diff lines are `uses: owner/repo@ref` bumps of the same action
+ * is released without either signal. Anything else in the diff holds it.
+ *
  * The point is to spend human attention only where a mistake is expensive,
  * rather than taxing every PR equally. See the global `sdlc` skill.
  *
@@ -39,6 +44,12 @@ const APPROVAL_LABEL = "danger-approved";
 const SPEC_EXCEPTION_RE = /^SDLC-Exception: plan-in-pr-body$/m;
 const SPEC_REF_RE = /^Spec: (\S+)$/m;
 const SMALL_DIFF_LINES = 200;
+const DEPENDABOT = "dependabot[bot]";
+const WORKFLOW_DIR = ".github/workflows/";
+// A `uses:` line, as a list item or a mapping value, with an optional comment.
+// Group 1 is the action name, which must survive the bump unchanged.
+const USES_LINE_RE =
+  /^\s*(?:-\s*)?uses:\s*([A-Za-z0-9_./-]+)@[A-Za-z0-9_./-]+\s*(?:#.*)?$/;
 
 // --- Glob matching. Supports `**`, `*`, and `?`. ---
 function toRegExp(pattern) {
@@ -87,7 +98,45 @@ function specReference(body, config) {
 }
 
 /**
- * Pure decision. Returns `{ gated, hits, errors, problems }`:
+ * True when every gated hit is a workflow file and the unified diff of those
+ * files changes nothing but `uses:` version refs. Each removed line must be
+ * followed by an added line naming the same action, so a swap from one
+ * action to another is not a bump. Diff headers and context lines are
+ * ignored; any other `+`/`-` line fails.
+ */
+function dependabotActionBump({ hits, author, headRepo, repo, workflowDiff }) {
+  if (author !== DEPENDABOT) return false;
+  if (!repo || headRepo !== repo) return false;
+  if (hits.length === 0 || !hits.every((h) => h.file.startsWith(WORKFLOW_DIR)))
+    return false;
+  const lines = (workflowDiff ?? "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter(
+      (l) =>
+        (l.startsWith("+") || l.startsWith("-")) &&
+        !l.startsWith("+++") &&
+        !l.startsWith("---"),
+    );
+  if (lines.length === 0) return false;
+  let pendingRemoval = null;
+  for (const line of lines) {
+    const m = USES_LINE_RE.exec(line.slice(1));
+    if (!m) return false;
+    if (line[0] === "-") {
+      if (pendingRemoval !== null) return false;
+      pendingRemoval = m[1];
+    } else {
+      if (pendingRemoval !== m[1]) return false;
+      pendingRemoval = null;
+    }
+  }
+  return pendingRemoval === null;
+}
+
+/**
+ * Pure decision. Returns `{ gated, hits, errors, problems, exempt? }`:
+ *   exempt   - "dependabot" when released by the action-bump exemption
  *   gated    - a danger-zone path was touched
  *   hits     - [{file, pattern}] of the touched paths
  *   errors   - reasons the gate is held; empty means released
@@ -106,6 +155,10 @@ function evaluate({
   specRefExists = false,
   config,
   ownerLogin,
+  author = "",
+  headRepo = "",
+  repo = "",
+  workflowDiff = "",
 }) {
   // Bodies edited in the GitHub UI arrive with CRLF; `$` would miss every line.
   body = (body ?? "").replace(/\r\n/g, "\n");
@@ -122,6 +175,19 @@ function evaluate({
   }
   if (hits.length === 0)
     return { gated: false, hits, errors: [], problems: [] };
+
+  if (
+    config.danger_zones?.dependabot_action_bumps === true &&
+    dependabotActionBump({ hits, author, headRepo, repo, workflowDiff })
+  ) {
+    return {
+      gated: true,
+      hits,
+      errors: [],
+      problems: [],
+      exempt: "dependabot",
+    };
+  }
 
   const problems = [];
 
@@ -190,6 +256,7 @@ function evaluate({
 
 module.exports = {
   evaluate,
+  dependabotActionBump,
   specReference,
   toRegExp,
   APPROVAL_LABEL,
@@ -422,6 +489,7 @@ function main() {
 
   let reviews, labelEvents, pr, ownerLogin, comments;
   let specRefExists = false;
+  let workflowDiff = "";
   try {
     reviews = ghJson(`repos/${REPO}/pulls/${PR_NUMBER}/reviews`, true).map(
       (r) => ({
@@ -443,6 +511,22 @@ function main() {
     )
       throw new Error("PR revision changed; evaluate the current revision");
     comments = readComments(REPO, PR_NUMBER);
+    // Only the gated workflow files, so the exemption never sees other paths.
+    const workflowHits = dry.hits
+      .map((h) => h.file)
+      .filter((f) => f.startsWith(WORKFLOW_DIR));
+    if (workflowHits.length > 0)
+      workflowDiff = execFileSync(
+        "git",
+        [
+          "diff",
+          "--no-renames",
+          `${BASE_SHA}...${HEAD_SHA}`,
+          "--",
+          ...workflowHits,
+        ],
+        { encoding: "utf8" },
+      );
     const event = process.env.GITHUB_EVENT_PATH
       ? JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"))
       : {};
@@ -501,8 +585,20 @@ function main() {
     specRefExists,
     config,
     ownerLogin,
+    author: pr.user?.login ?? "",
+    headRepo: pr.head?.repo?.full_name ?? "",
+    repo: REPO,
+    workflowDiff,
   });
   const { errors } = verdict;
+
+  if (verdict.exempt === "dependabot") {
+    console.log(
+      "Dependabot action bump: only `uses:` version refs changed in workflow files. " +
+        "Gate released without a human signal.",
+    );
+    return;
+  }
 
   // The verdict is fixed above. Reporting it can only log on failure.
   try {
