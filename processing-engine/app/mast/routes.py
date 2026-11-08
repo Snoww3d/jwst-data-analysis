@@ -536,7 +536,6 @@ async def download_observation(request: MastDownloadRequest):
         status=result.get("status", "unknown"),
         obs_id=request.obs_id,
         files=result.get("files", []),
-        file_count=len(result.get("files", [])),
         download_dir=result.get("download_dir"),
         error=result.get("error"),
         timestamp=result.get("timestamp", datetime.now(UTC).isoformat()),
