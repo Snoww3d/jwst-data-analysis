@@ -9,8 +9,7 @@ class MockResizeObserver {
   observe = vi.fn();
   unobserve = vi.fn();
   disconnect = vi.fn();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(_callback: (entries: any[]) => void) {}
+  constructor(_callback: ResizeObserverCallback) {}
 }
 vi.stubGlobal('ResizeObserver', MockResizeObserver);
 

@@ -71,6 +71,7 @@ export default [
         RequestInit: 'readonly',
         Response: 'readonly',
         ResizeObserver: 'readonly',
+        ResizeObserverCallback: 'readonly',
         IntersectionObserver: 'readonly',
         SVGSVGElement: 'readonly',
         DOMRect: 'readonly',
