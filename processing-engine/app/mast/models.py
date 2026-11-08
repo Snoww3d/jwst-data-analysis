@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class MastSearchType(str, Enum):
@@ -198,10 +198,15 @@ class MastDownloadResponse(BaseModel):
     status: str
     obs_id: str
     files: list[str] = []
-    file_count: int = 0
     download_dir: str | None = None
     error: str | None = None
     timestamp: str
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def file_count(self) -> int:
+        """Number of downloaded files; always derived from ``files`` (#1010)."""
+        return len(self.files)
 
 
 class MastDataProductsRequest(BaseModel):
