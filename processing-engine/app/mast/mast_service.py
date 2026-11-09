@@ -10,6 +10,7 @@ import logging
 import math
 import os
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field as dc_field
@@ -17,6 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
+import numpy as np
 from astropy.coordinates import SkyCoord, angular_separation
 from astroquery.mast import Observations
 
@@ -1188,11 +1190,6 @@ class MastService:
 
     def _table_to_dict_list(self, table) -> list[dict[str, Any]]:
         """Convert astropy Table to list of dicts using fast pandas conversion."""
-        import math
-        import time
-
-        import numpy as np
-
         if table is None or len(table) == 0:
             return []
 
